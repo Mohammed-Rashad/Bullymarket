@@ -1,0 +1,73 @@
+name: bullymarket
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bullymarket}
+      POSTGRES_USER: ${POSTGRES_USER:-bullymarket}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bullymarket}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment: &api-environment
+      BULLYMARKET_ENVIRONMENT: ${BULLYMARKET_ENVIRONMENT:-production}
+      BULLYMARKET_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-bullymarket}:${POSTGRES_PASSWORD:-bullymarket}@postgres:5432/${POSTGRES_DB:-bullymarket}
+      BULLYMARKET_JWT_SECRET: ${BULLYMARKET_JWT_SECRET:-development-only-change-me-use-at-least-32-bytes}
+      BULLYMARKET_ACCESS_TOKEN_MINUTES: ${BULLYMARKET_ACCESS_TOKEN_MINUTES:-1440}
+      BULLYMARKET_DEFAULT_STARTING_BALANCE: ${BULLYMARKET_DEFAULT_STARTING_BALANCE:-1000}
+      BULLYMARKET_DEFAULT_LIQUIDITY_SEED: ${BULLYMARKET_DEFAULT_LIQUIDITY_SEED:-100}
+      BULLYMARKET_MINIMUM_TRADE_AMOUNT: ${BULLYMARKET_MINIMUM_TRADE_AMOUNT:-1}
+      BULLYMARKET_REFILL_AMOUNT: ${BULLYMARKET_REFILL_AMOUNT:-500}
+      BULLYMARKET_REFILL_INTERVAL_DAYS: ${BULLYMARKET_REFILL_INTERVAL_DAYS:-7}
+      BULLYMARKET_CORS_ORIGINS: '${BULLYMARKET_CORS_ORIGINS:-["http://localhost:3000"]}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *api-environment
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

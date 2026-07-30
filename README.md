@@ -15,9 +15,44 @@ The important product invariant is enforced from the database through the UI:
 
 - `backend/` — async FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL, pytest
 - `frontend/` — Next.js App Router, TypeScript, Tailwind CSS, TanStack Query
+- `backend/compose.yaml` — the API, migration, and PostgreSQL stack
 - `01_...md` through `06_...md` — product and architecture decisions
 
-## Run locally
+## Run with Docker
+
+The Compose project lives in `backend/` and starts PostgreSQL, applies all pending
+Alembic migrations, then starts the API:
+
+```bash
+cd backend
+cp .env.example .env
+docker compose up --build
+```
+
+The API is available at `http://localhost:8000`, and its interactive documentation is
+at `http://localhost:8000/docs`. Run the frontend separately using the instructions
+under [Frontend](#2-frontend); it connects to this API through the default
+`frontend/.env.example` configuration.
+
+The database is persisted in the `bullymarket_postgres-data` Docker volume. Stop the
+stack without deleting its data:
+
+```bash
+cd backend
+docker compose down
+```
+
+For any shared or internet-accessible environment, replace `POSTGRES_PASSWORD` and
+`BULLYMARKET_JWT_SECRET` in `backend/.env` before starting the stack.
+
+Run the periodic balance refill inside the API image when needed:
+
+```bash
+cd backend
+docker compose run --rm api python -m app.modules.refill.job
+```
+
+## Run without Docker
 
 ### 1. Backend
 
@@ -32,11 +67,10 @@ export BULLYMARKET_DATABASE_URL='sqlite+aiosqlite:///./backend/bullymarket.db'
 .venv/bin/uvicorn app.main:app --app-dir backend --reload
 ```
 
-For PostgreSQL, start the included database service and use the defaults from
-`backend/.env.example`:
+For PostgreSQL, use the defaults from `backend/.env.example` with a locally installed
+database:
 
 ```bash
-docker compose up -d postgres
 cp backend/.env.example backend/.env
 cd backend
 ../.venv/bin/alembic upgrade head
