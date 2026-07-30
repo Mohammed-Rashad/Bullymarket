@@ -301,12 +301,15 @@ updated, floating point drift) and easy to miss by eye:
    points yields ~18.2 shares, correctly, because YES is the cheap/underbought side
    there — same as buying more than $10 worth of a stock trading under a dollar). The
    real invariants to test: `shares_out` is always positive and finite for positive
-   `amount`; when pools are exactly balanced (price = 0.5 on both sides), `shares_out` is
-   strictly less than `amount` (this is the one case where the flat rule does hold, and
-   is what the worked example in 3.2 demonstrates); and more generally, `shares_out *
-   price_after_side_being_bought` is always less than or equal to `amount` (you never
-   extract more value than you paid, evaluated at the post-trade price) — this is the
-   version of "no free lunch" that holds unconditionally.
+   `amount`; `shares_out` is always strictly less than the selected outcome's inventory
+   before the trade; and when pools are exactly balanced (price = 0.5 on both sides),
+   `shares_out` is strictly less than `amount` (this is the one case where the flat rule
+   does hold, and is what the worked example in 3.2 demonstrates). Do **not** assert
+   `shares_out * displayed_price_after <= amount`: that expression can be greater than
+   the stake for an underbought outcome because the displayed pool-ratio probability is
+   not the trade's average execution price. The draft once claimed this was an
+   unconditional "no free lunch" invariant; property tests produced a counterexample
+   and the claim was removed.
 4. **Path independence**: buying `amount` in one trade yields the *exact same* `shares_out`
    (within epsilon) as buying it in two back-to-back trades that sum to `amount`, with
    no other trades in between. This is a real, verified property of the constant-product
