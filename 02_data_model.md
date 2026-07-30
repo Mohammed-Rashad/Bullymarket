@@ -75,7 +75,9 @@ Balance is **not** a column here. It's derived (see `ledger_entries` below and t
 | group_id | uuid, fk → groups.id | |
 | user_id | uuid, fk → users.id | |
 | role | enum: `member`, `admin` | the creator's row is `admin` by default; creator can promote others |
+| status | enum: `active`, `removed` | removed memberships are retained so existing-bet access can be settled correctly |
 | joined_at | timestamptz | |
+| removed_at | timestamptz, nullable | set when an admin removes the member |
 
 Unique constraint on `(group_id, user_id)` — can't join the same group twice.
 
@@ -93,13 +95,14 @@ a regular member of Group B), so it belongs on the join table, not as a global f
 | question | text | e.g. "Does Ahmed go to the gym this week?" |
 | description | text, nullable | optional longer context |
 | visibility | enum: `group`, `public` | this is the bet's mutually exclusive scope; see the constraint below |
-| status | enum: `open`, `closed`, `resolved` | `closed` = past end_time, awaiting resolution; `resolved` = paid out |
+| status | enum: `open`, `closed`, `resolved`, `cancelled` | `closed` = past end_time, awaiting resolution; `resolved` = paid out; `cancelled` = soft-deleted and stakes refunded |
 | end_time | timestamptz | betting closes at this time |
 | resolved_outcome_id | uuid, fk → outcomes.id, nullable | set once resolved |
 | resolved_at | timestamptz, nullable | time of the first resolution; set once and not moved by later corrections, so leaderboard time windows stay stable |
 | resolved_by | uuid, fk → users.id, nullable | authorized user responsible for the current winning outcome; a group admin for group bets |
 | liquidity_seed | numeric | the `L` value from §3.1, fixed at creation, needed to reconstruct pool state and for the system-owned liquidity-provider position at payout time |
 | created_at | timestamptz | |
+| cancelled_at | timestamptz, nullable | set when a bet is cancelled |
 
 Add a database `CHECK` constraint named `ck_bets_scope_matches_group`:
 
@@ -157,7 +160,7 @@ for every user is a row here, and a user's balance is `SUM(amount) WHERE user_id
 | id | uuid, pk | |
 | user_id | uuid, fk → users.id | |
 | amount | numeric | positive (credit) or negative (debit) |
-| entry_type | enum: `refill`, `bet_placed`, `payout`, `resolution_reversal` | see below |
+| entry_type | enum: `refill`, `bet_placed`, `payout`, `resolution_reversal`, `bet_refund` | see below |
 | bet_id | uuid, fk → bets.id, nullable | null for `refill` entries |
 | related_ledger_entry_id | uuid, fk → ledger_entries.id, nullable | for `resolution_reversal` rows, points back at the `payout` entry being reversed — this is what makes §3.5's "exact reversal" auditable and mechanical rather than a special code path that recomputes from scratch |
 | created_at | timestamptz | |
@@ -176,6 +179,10 @@ Entry types, mapped directly to actions in `01_overview_and_mechanism.md`:
   `payout` entry for the corrected outcome. A user's balance after correction is
   therefore exactly `original_balance - old_payout + new_payout`, which is provably
   correct rather than "recompute and hope."
+- `bet_refund`: positive amount returning a participant's original stake when an
+  unresolved bet is cancelled. Cancelling is a soft state transition rather than a
+  physical row deletion so the ledger's `bet_id` reference and audit history remain
+  intact.
 
 A `user_balances` value is never stored as a mutable column — it's always
 `SELECT SUM(amount) FROM ledger_entries WHERE user_id = :id`. For performance once the
@@ -237,6 +244,23 @@ Because `bet_visibility_overrides.group_id` is non-null while a public bet's
 database level. The membership foreign key also prevents an allow-list from naming
 someone outside the bet's group. The service should still reject either mistake with a
 useful domain error before the constraint fires.
+
+### `bet_edit_events`
+Audit trail for the explicitly allowed end-time edit.
+
+| column | type | notes |
+|---|---|---|
+| id | uuid, pk | |
+| bet_id | uuid, fk → bets.id | |
+| edited_by | uuid, fk → users.id | |
+| edit_type | enum: `end_time` | leaves room for other explicitly audited edits later |
+| old_value | text | prior ISO-8601 value |
+| new_value | text | replacement ISO-8601 value |
+| created_at | timestamptz | |
+
+Every end-time change creates one row. A group bet may be edited only by a group admin;
+a public bet follows the signed-in public-bet policy. A resolved or cancelled bet cannot
+be edited.
 
 ---
 
@@ -322,9 +346,9 @@ The initial Alembic history must:
    dependency cycle, create the `outcomes` table before adding the named
    `resolved_outcome_id` foreign key (or use SQLAlchemy's `use_alter=True`) so both
    upgrade and downgrade ordering are deterministic.
-3. Create `positions`, `ledger_entries`, `resolution_events`, and
-   `bet_visibility_overrides`, including every unique constraint and foreign key named
-   in this document.
+3. Create `positions`, `ledger_entries`, `resolution_events`,
+   `bet_visibility_overrides`, and `bet_edit_events`, including every unique constraint
+   and foreign key named in this document.
 4. Add query indexes for `(group_id, status, resolved_at)` on group bets,
    `(visibility, status, resolved_at)` for the public leaderboard, and
    `(bet_id, user_id, entry_type)` on `ledger_entries`.

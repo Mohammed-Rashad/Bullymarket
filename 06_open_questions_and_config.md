@@ -47,23 +47,18 @@ not built now):**
 - Real-time (WebSocket/SSE) odds updates — noted in `04_frontend_architecture.md` §4.
 - Per-bet custom liquidity seed at creation time (v1 uses one platform-wide default).
 
-## Real open questions for the user (not decided in this plan — flag these before/during
-build rather than silently picking an answer)
+## Resolved product decisions
 
-1. **What happens to a user's open positions if they leave a group, or a bet is deleted
-   If a bet is deleted, the original amount must be returned to all participants. if a person gets kicked out of a group, he keeps particiating in bets he previously participated in until the bet ends, but he can not see or participate in future bets, and he gets clearly informed that he is kicked and waiting to finish the bets
-2. **Can a bet's `end_time` be edited after creation?** Not addressed above. If yes, this
-   Yes, a bet time can be edited.
-3. **Minimum/maximum bet amount per trade?** Not addressed above — currently unbounded
-   1 point
-4. **What exactly counts as "public"?** Public bets are confirmed to be standalone and
-   outside all groups. What remains to confirm is whether "public" means any signed-in
-   account on the platform
-5. **Who can create and resolve standalone public bets?** Group-admin authorization
-   anyone with an account
-
-These should be resolved (either by the user or by the coding agent making an explicit,
-documented default choice and flagging it in a `DECISIONS.md` or similar in the actual
-repo) rather than silently guessed at during implementation — the same "verify, don't
-assume" principle that governed the AMM math in `01_overview_and_mechanism.md` applies
-to product decisions too, just with different stakes.
+1. **Bet deletion is a cancellation with refunds.** Return every participant's original
+   stake through append-only `bet_refund` ledger entries and retain the cancelled bet
+   for auditability.
+2. **Removed group members keep only existing-bet access.** A removed member cannot see
+   or enter future group bets. They remain able to see bets in which they already hold
+   a position until those bets resolve or are cancelled, and the UI must clearly show
+   that they were removed and are only waiting for those bets to finish.
+3. **A bet's `end_time` is editable.** Record every change in `bet_edit_events`; resolved
+   and cancelled bets remain immutable.
+4. **The minimum trade is 1 point.** Keep it in the `MINIMUM_TRADE_AMOUNT` setting rather
+   than hardcoding it in the trading service.
+5. **Public means signed-in platform users.** Public bets remain completely outside
+   groups. Any account may view, create, and resolve a standalone public bet.

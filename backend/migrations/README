@@ -1,0 +1,6 @@
+Alembic migrations are the only supported way to create or change the database schema.
+
+Run from the repository root:
+
+    .venv/bin/alembic -c backend/alembic.ini upgrade head
+
