@@ -296,9 +296,18 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
     )
     assert removed.status_code == 200
 
+    rejoin = await client.post(
+        "/api/v1/groups/join",
+        json={"invite_code": group["invite_code"]},
+        headers=auth(member_token),
+    )
+    assert rejoin.status_code == 403
+    assert rejoin.json()["error"]["code"] == "membership_removed"
+
     pending_groups = await client.get("/api/v1/groups", headers=auth(member_token))
     assert pending_groups.json()[0]["membership_status"] == "removed"
     assert pending_groups.json()[0]["pending_settlement"] is True
+    assert pending_groups.json()[0]["invite_code"] is None
 
     existing_access = await client.get(
         f"/api/v1/bets/{existing_bet['id']}",
@@ -327,7 +336,8 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
         f"/api/v1/groups/{group['id']}/bets",
         headers=auth(member_token),
     )
-    assert group_feed.status_code == 403
+    assert group_feed.status_code == 200
+    assert [row["id"] for row in group_feed.json()] == [existing_bet["id"]]
 
     cancellation = await client.delete(
         f"/api/v1/bets/{existing_bet['id']}",

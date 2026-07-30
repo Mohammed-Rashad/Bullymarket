@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, status
 
 from app.api.dependencies import CurrentUser, SessionDependency
-from app.modules.groups.models import Group, GroupMember
+from app.modules.groups.models import Group, GroupMember, MembershipStatus
 from app.modules.groups.schemas import (
     CreateGroupRequest,
     GroupResponse,
@@ -33,7 +33,11 @@ def _group_response(
         id=group.id,
         name=group.name,
         description=group.description,
-        invite_code=group.invite_code,
+        invite_code=(
+            group.invite_code
+            if membership.status is MembershipStatus.ACTIVE
+            else None
+        ),
         created_by=group.created_by,
         created_at=group.created_at,
         role=membership.role,

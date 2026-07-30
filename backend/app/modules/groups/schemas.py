@@ -25,7 +25,7 @@ class GroupResponse(BaseModel):
     id: UUID
     name: str
     description: str | None
-    invite_code: str
+    invite_code: str | None
     created_by: UUID
     created_at: datetime
     role: MemberRole

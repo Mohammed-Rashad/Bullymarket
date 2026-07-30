@@ -55,7 +55,8 @@ not built now):**
 2. **Removed group members keep only existing-bet access.** A removed member cannot see
    or enter future group bets. They remain able to see bets in which they already hold
    a position until those bets resolve or are cancelled, and the UI must clearly show
-   that they were removed and are only waiting for those bets to finish.
+   that they were removed and are only waiting for those bets to finish. The shared
+   invite code cannot reactivate a removed membership and is not returned to that user.
 3. **A bet's `end_time` is editable.** Record every change in `bet_edit_events`; resolved
    and cancelled bets remain immutable.
 4. **The minimum trade is 1 point.** Keep it in the `MINIMUM_TRADE_AMOUNT` setting rather

@@ -156,9 +156,17 @@ async def create_public_bet(
 async def list_visible_group_bets(
     session: AsyncSession, *, group_id: UUID, user_id: UUID
 ) -> list[BetResponse]:
-    membership = await require_membership(session, group_id, user_id)
+    membership = await get_membership_state(session, group_id, user_id)
+    if membership is None:
+        raise DomainError("not_group_member", "You are not a member of this group", 403)
     results: list[BetResponse] = []
     for bet in await repository.list_group_bets(session, group_id):
+        if membership.status is MembershipStatus.REMOVED:
+            from app.modules.trading.service import has_position
+
+            if await has_position(session, bet_id=bet.id, user_id=user_id):
+                results.append(await build_response(session, bet))
+            continue
         if await _visibility_allows(
             session,
             bet=bet,

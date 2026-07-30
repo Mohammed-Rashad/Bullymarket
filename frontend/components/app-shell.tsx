@@ -1,0 +1,74 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+
+import { useAuthToken, useLogout, useMe } from "@/features/auth/hooks";
+
+const links = [
+  { href: "/groups", label: "My groups" },
+  { href: "/public", label: "Public markets" },
+  { href: "/leaderboard", label: "Leaderboard" },
+];
+
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const token = useAuthToken();
+  const logout = useLogout();
+  const me = useMe();
+  const isAuthPage = pathname === "/login" || pathname === "/signup";
+
+  if (isAuthPage) return <>{children}</>;
+
+  return (
+    <div className="app-frame">
+      <header className="topbar">
+        <Link className="brand" href="/">
+          <span className="brand-mark">B</span>
+          <span>
+            <strong>BullyMarket</strong>
+            <small>friendly stakes, sharp calls</small>
+          </span>
+        </Link>
+        <nav className="nav-links" aria-label="Primary navigation">
+          {links.map((link) => (
+            <Link
+              className={pathname.startsWith(link.href) ? "active" : ""}
+              href={link.href}
+              key={link.href}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="account-strip">
+          {token ? (
+            <>
+              <span className="balance-pill">
+                <small>Balance</small>
+                <strong>{Number(me.data?.balance ?? 0).toFixed(2)} pts</strong>
+              </span>
+              <button
+                className="text-button"
+                onClick={() => {
+                  logout();
+                  router.push("/login");
+                }}
+                type="button"
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link className="button compact" href="/login">
+              Sign in
+            </Link>
+          )}
+        </div>
+      </header>
+      <main className="page-shell">{children}</main>
+    </div>
+  );
+}
+

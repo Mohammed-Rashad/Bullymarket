@@ -71,9 +71,11 @@ async def join_group(
     elif membership.status is MembershipStatus.ACTIVE:
         raise DomainError("already_member", "You are already a member of this group", 409)
     else:
-        membership.status = MembershipStatus.ACTIVE
-        membership.removed_at = None
-        membership.joined_at = datetime.now(UTC)
+        raise DomainError(
+            "membership_removed",
+            "An admin removed you from this group; the shared invite cannot restore access",
+            403,
+        )
     await session.flush()
     return group, membership
 
