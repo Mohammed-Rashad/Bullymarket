@@ -150,7 +150,7 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "(visibility = 'group' AND group_id IS NOT NULL) OR "
             "(visibility = 'public' AND group_id IS NULL)",
-            name="ck_bets_scope_matches_group",
+            name="scope_matches_group",
         ),
         sa.ForeignKeyConstraint(
             ["created_by"], ["users.id"], name="fk_bets_created_by_users"

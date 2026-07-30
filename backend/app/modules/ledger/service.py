@@ -28,3 +28,21 @@ async def add_entry(
 
 async def get_balance(session: AsyncSession, user_id: UUID) -> Decimal:
     return await repository.get_balance(session, user_id)
+
+
+async def get_bet_stakes(
+    session: AsyncSession, bet_id: UUID
+) -> list[tuple[UUID, Decimal]]:
+    return await repository.get_bet_stakes(session, bet_id)
+
+
+async def get_unreversed_payouts(
+    session: AsyncSession, bet_id: UUID
+) -> list[LedgerEntry]:
+    return await repository.get_unreversed_payouts(session, bet_id)
+
+
+async def get_net_results(
+    session: AsyncSession, bet_ids: list[UUID]
+) -> list[tuple[UUID, Decimal]]:
+    return await repository.get_net_results(session, bet_ids)

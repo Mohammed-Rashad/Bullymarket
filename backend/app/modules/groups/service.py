@@ -9,6 +9,12 @@ from app.modules.groups import repository
 from app.modules.groups.models import Group, GroupMember, MemberRole, MembershipStatus
 
 
+async def get_membership_state(
+    session: AsyncSession, group_id: UUID, user_id: UUID
+) -> GroupMember | None:
+    return await repository.get_membership(session, group_id, user_id)
+
+
 async def require_membership(
     session: AsyncSession,
     group_id: UUID,
@@ -74,8 +80,23 @@ async def join_group(
 
 async def list_user_groups(
     session: AsyncSession, user_id: UUID
-) -> list[tuple[Group, GroupMember]]:
-    return await repository.list_user_groups(session, user_id)
+) -> list[tuple[Group, GroupMember, bool]]:
+    rows = await repository.list_user_groups(session, user_id)
+    results: list[tuple[Group, GroupMember, bool]] = []
+    for group, membership in rows:
+        if membership.status is MembershipStatus.ACTIVE:
+            results.append((group, membership, False))
+            continue
+        from app.modules.trading.service import has_unsettled_group_position
+
+        pending = await has_unsettled_group_position(
+            session,
+            group_id=group.id,
+            user_id=user_id,
+        )
+        if pending:
+            results.append((group, membership, True))
+    return results
 
 
 async def list_group_members(

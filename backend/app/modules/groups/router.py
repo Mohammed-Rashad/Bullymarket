@@ -23,7 +23,12 @@ from app.modules.groups.service import (
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 
-def _group_response(group: Group, membership: GroupMember) -> GroupResponse:
+def _group_response(
+    group: Group,
+    membership: GroupMember,
+    *,
+    pending_settlement: bool = False,
+) -> GroupResponse:
     return GroupResponse(
         id=group.id,
         name=group.name,
@@ -33,6 +38,7 @@ def _group_response(group: Group, membership: GroupMember) -> GroupResponse:
         created_at=group.created_at,
         role=membership.role,
         membership_status=membership.status,
+        pending_settlement=pending_settlement,
     )
 
 
@@ -56,8 +62,14 @@ async def list_groups_route(
     session: SessionDependency, current_user: CurrentUser
 ) -> list[GroupResponse]:
     return [
-        _group_response(group, membership)
-        for group, membership in await list_user_groups(session, current_user.id)
+        _group_response(
+            group,
+            membership,
+            pending_settlement=pending_settlement,
+        )
+        for group, membership, pending_settlement in await list_user_groups(
+            session, current_user.id
+        )
     ]
 
 

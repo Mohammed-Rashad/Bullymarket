@@ -30,6 +30,7 @@ class GroupResponse(BaseModel):
     created_at: datetime
     role: MemberRole
     membership_status: MembershipStatus
+    pending_settlement: bool = False
 
 
 class MemberResponse(BaseModel):
@@ -40,4 +41,3 @@ class MemberResponse(BaseModel):
     status: MembershipStatus
     joined_at: datetime
     removed_at: datetime | None
-

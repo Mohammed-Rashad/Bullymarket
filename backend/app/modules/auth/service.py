@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy.exc import IntegrityError
@@ -22,6 +23,7 @@ async def signup(session: AsyncSession, payload: SignupRequest, settings: Settin
             display_name=payload.display_name,
             password_hash=hash_password(payload.password),
         )
+        user.last_refill_at = datetime.now(UTC)
         await add_entry(
             session,
             user_id=user.id,
@@ -38,4 +40,3 @@ async def login(session: AsyncSession, payload: LoginRequest, settings: Settings
     if user is None or not verify_password(payload.password, user.password_hash):
         raise DomainError("invalid_credentials", "Email or password is incorrect", 401)
     return create_access_token(user.id, settings)
-

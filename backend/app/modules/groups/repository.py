@@ -65,7 +65,6 @@ async def list_user_groups(
         .join(GroupMember, GroupMember.group_id == Group.id)
         .where(
             GroupMember.user_id == user_id,
-            GroupMember.status == MembershipStatus.ACTIVE,
         )
         .order_by(Group.created_at.desc())
     )
@@ -80,4 +79,3 @@ async def list_members(session: AsyncSession, group_id: UUID) -> list[GroupMembe
             .order_by(GroupMember.joined_at)
         )
     )
-

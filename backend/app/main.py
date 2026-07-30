@@ -3,6 +3,8 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import RequestResponseEndpoint
+from starlette.responses import Response
 
 from app.api.router import api_router
 from app.core.config import get_settings
@@ -23,11 +25,14 @@ def create_app() -> FastAPI:
     )
 
     @app.middleware("http")
-    async def add_request_id(request: Request, call_next: object) -> JSONResponse:
+    async def add_request_id(
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
         request_id = request.headers.get("x-request-id", str(uuid4()))
         token = request_id_context.set(request_id)
         try:
-            response = await call_next(request)  # type: ignore[operator]
+            response = await call_next(request)
             response.headers["x-request-id"] = request_id
             return response
         finally:
@@ -52,4 +57,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
