@@ -15,7 +15,9 @@ balance is derived from `SUM(ledger_entries.amount)`; it is not a mutable user c
 
 `groups` stores name, description, creator, and invite code. `group_members` has a unique
 `(group_id, user_id)`, scoped role (`member`/`admin`), and retained status
-(`active`/`removed`). Removal never destroys settlement history.
+(`active`/`removed`). Removal never destroys settlement history. Member API responses
+join the current user `display_name` for presentation; names are not duplicated in the
+membership table.
 
 ## 2. Markets
 

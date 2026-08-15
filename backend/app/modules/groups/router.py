@@ -23,6 +23,17 @@ from app.modules.groups.service import (
 router = APIRouter(prefix="/groups", tags=["groups"])
 
 
+def _member_response(membership: GroupMember, display_name: str) -> MemberResponse:
+    return MemberResponse(
+        user_id=membership.user_id,
+        display_name=display_name,
+        role=membership.role,
+        status=membership.status,
+        joined_at=membership.joined_at,
+        removed_at=membership.removed_at,
+    )
+
+
 def _group_response(
     group: Group,
     membership: GroupMember,
@@ -102,7 +113,10 @@ async def list_members_route(
         group_id=group_id,
         requesting_user_id=current_user.id,
     )
-    return [MemberResponse.model_validate(member) for member in members]
+    return [
+        _member_response(membership, display_name)
+        for membership, display_name in members
+    ]
 
 
 @router.delete("/{group_id}/members/{member_user_id}", response_model=MemberResponse)
@@ -112,13 +126,13 @@ async def remove_member_route(
     session: SessionDependency,
     current_user: CurrentUser,
 ) -> MemberResponse:
-    membership = await remove_member(
+    membership, display_name = await remove_member(
         session,
         group_id=group_id,
         member_user_id=member_user_id,
         requesting_user_id=current_user.id,
     )
-    return MemberResponse.model_validate(membership)
+    return _member_response(membership, display_name)
 
 
 @router.patch("/{group_id}/members/{member_user_id}", response_model=MemberResponse)
@@ -129,11 +143,11 @@ async def update_member_route(
     session: SessionDependency,
     current_user: CurrentUser,
 ) -> MemberResponse:
-    membership = await update_member_role(
+    membership, display_name = await update_member_role(
         session,
         group_id=group_id,
         member_user_id=member_user_id,
         role=payload.role,
         requesting_user_id=current_user.id,
     )
-    return MemberResponse.model_validate(membership)
+    return _member_response(membership, display_name)

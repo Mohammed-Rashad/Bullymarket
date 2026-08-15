@@ -57,7 +57,9 @@ which recomputes the quote while holding the market lock.
 
 - **Group dashboard**: list of open bets in the group (respecting visibility rules from
   `02_data_model.md`'s `bet_visibility_overrides`), group leaderboard preview, "create
-  bet" action. Creating here always creates a group bet; there is no "make public"
+  bet" action. Member lists and visibility selectors show display names, while IDs are
+  used only as internal keys and API values. Creating here always creates a group bet;
+  there is no "make public"
   toggle because public bets do not belong to groups.
 - **Bet detail page**: question, current odds from the polled `/price` response, a
   buy-share form with the live quote described above, immutable trade audit, and market

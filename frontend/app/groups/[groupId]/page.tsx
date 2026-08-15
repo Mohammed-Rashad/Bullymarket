@@ -150,7 +150,7 @@ export default function GroupDetailPage() {
                 {members.data?.map((member) => (
                   <div className="market-meta" key={member.user_id}>
                     <span>
-                      {member.user_id.slice(0, 8)} · {member.role}
+                      {member.display_name} · {member.role}
                     </span>
                     {group.role === "admin" &&
                     member.role !== "admin" &&

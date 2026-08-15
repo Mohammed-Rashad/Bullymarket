@@ -83,6 +83,7 @@ async def test_group_join_roles_and_removal_state(client: AsyncClient) -> None:
         f"/api/v1/groups/{group['id']}/members",
         headers=auth(admin_token),
     )
+    assert {row["display_name"] for row in members.json()} == {"Admin", "Member"}
     member = next(row for row in members.json() if row["role"] == "member")
 
     forbidden = await client.delete(
@@ -97,6 +98,7 @@ async def test_group_join_roles_and_removal_state(client: AsyncClient) -> None:
     )
     assert removed.status_code == 200
     assert removed.json()["status"] == "removed"
+    assert removed.json()["display_name"] == "Member"
 
     member_groups = await client.get("/api/v1/groups", headers=auth(member_token))
     assert member_groups.status_code == 200

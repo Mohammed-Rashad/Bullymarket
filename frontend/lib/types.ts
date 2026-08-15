@@ -26,6 +26,7 @@ export interface Group {
 
 export interface GroupMember {
   user_id: string;
+  display_name: string;
   role: "member" | "admin";
   status: "active" | "removed";
   joined_at: string;

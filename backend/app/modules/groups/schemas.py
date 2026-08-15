@@ -37,6 +37,7 @@ class MemberResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     user_id: UUID
+    display_name: str
     role: MemberRole
     status: MembershipStatus
     joined_at: datetime

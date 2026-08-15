@@ -7,6 +7,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import DomainError
 from app.modules.groups import repository
 from app.modules.groups.models import Group, GroupMember, MemberRole, MembershipStatus
+from app.modules.users.service import list_users_by_ids
+
+
+async def _members_with_names(
+    session: AsyncSession,
+    members: list[GroupMember],
+) -> list[tuple[GroupMember, str]]:
+    users = await list_users_by_ids(session, [member.user_id for member in members])
+    display_names = {user.id: user.display_name for user in users}
+    try:
+        return [(member, display_names[member.user_id]) for member in members]
+    except KeyError as exc:
+        raise DomainError(
+            "invalid_membership",
+            "A group membership references a missing user",
+            500,
+        ) from exc
 
 
 async def get_membership_state(
@@ -103,9 +120,12 @@ async def list_user_groups(
 
 async def list_group_members(
     session: AsyncSession, *, group_id: UUID, requesting_user_id: UUID
-) -> list[GroupMember]:
+) -> list[tuple[GroupMember, str]]:
     await require_membership(session, group_id, requesting_user_id)
-    return await repository.list_members(session, group_id)
+    return await _members_with_names(
+        session,
+        await repository.list_members(session, group_id),
+    )
 
 
 async def remove_member(
@@ -114,7 +134,7 @@ async def remove_member(
     group_id: UUID,
     member_user_id: UUID,
     requesting_user_id: UUID,
-) -> GroupMember:
+) -> tuple[GroupMember, str]:
     await require_admin(session, group_id, requesting_user_id)
     group = await repository.get_group(session, group_id)
     if group is None:
@@ -127,7 +147,7 @@ async def remove_member(
     membership.status = MembershipStatus.REMOVED
     membership.removed_at = datetime.now(UTC)
     await session.flush()
-    return membership
+    return (await _members_with_names(session, [membership]))[0]
 
 
 async def update_member_role(
@@ -137,7 +157,7 @@ async def update_member_role(
     member_user_id: UUID,
     role: MemberRole,
     requesting_user_id: UUID,
-) -> GroupMember:
+) -> tuple[GroupMember, str]:
     await require_admin(session, group_id, requesting_user_id)
     group = await repository.get_group(session, group_id)
     if group is None:
@@ -151,4 +171,4 @@ async def update_member_role(
     membership = await require_membership(session, group_id, member_user_id)
     membership.role = role
     await session.flush()
-    return membership
+    return (await _members_with_names(session, [membership]))[0]

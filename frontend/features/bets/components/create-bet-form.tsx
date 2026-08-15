@@ -139,7 +139,7 @@ export function CreateBetForm({
                       }
                       type="checkbox"
                     />{" "}
-                    Member {member.user_id.slice(0, 8)}
+                    {member.display_name}
                   </label>
                 ))}
             </div>
