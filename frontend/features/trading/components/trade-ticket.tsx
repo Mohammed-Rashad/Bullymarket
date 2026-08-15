@@ -31,7 +31,12 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    execute.mutate({ side, shares });
+    execute.mutate(
+      { side, shares },
+      {
+        onSuccess: () => setShares(""),
+      },
+    );
   }
 
   return (
@@ -112,7 +117,12 @@ function LegacyBuyTicket({ bet }: { bet: Bet }) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    buy.mutate({ outcome_id: outcomeId, amount });
+    buy.mutate(
+      { outcome_id: outcomeId, amount },
+      {
+        onSuccess: () => setAmount(""),
+      },
+    );
   }
 
   return (

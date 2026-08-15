@@ -1,8 +1,10 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bet } from "@/lib/types";
 import { TradeTicket } from "./trade-ticket";
+
+const { lmsrMutate } = vi.hoisted(() => ({ lmsrMutate: vi.fn() }));
 
 vi.mock("../hooks", () => ({
   useLmsrPrice: () => ({ data: { price_yes: "0.5", price_no: "0.5" } }),
@@ -20,13 +22,16 @@ vi.mock("../hooks", () => ({
     data: null,
     error: null,
     isPending: false,
-    mutate: vi.fn(),
+    mutate: lmsrMutate,
   }),
   useBuyPreview: vi.fn(),
   useBuy: vi.fn(),
 }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  lmsrMutate.mockReset();
+});
 
 const bet: Bet = {
   id: "bet-1",
@@ -64,5 +69,20 @@ describe("TradeTicket", () => {
     expect(shares).toBeValid();
     expect(screen.getByRole("button", { name: "Buy shares" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sell" })).not.toBeInTheDocument();
+  });
+
+  it("clears and disables the form after a successful purchase", () => {
+    lmsrMutate.mockImplementationOnce(
+      (
+        _input: unknown,
+        options?: { onSuccess?: () => void },
+      ) => options?.onSuccess?.(),
+    );
+    render(<TradeTicket bet={bet} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Buy shares" }));
+
+    expect(screen.getByLabelText("Shares to buy")).toHaveValue(null);
+    expect(screen.getByRole("button", { name: "Buy shares" })).toBeDisabled();
   });
 });
