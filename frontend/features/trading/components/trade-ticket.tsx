@@ -84,7 +84,7 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
           {(Number(quote.data.price_no_after) * 100).toFixed(1)}%
         </div>
       ) : null}
-      {quote.isFetching ? <p className="muted">Updating LMSR quote…</p> : null}
+      {quote.isFetching ? <p className="muted">Updating quote…</p> : null}
       {quote.error ? <ErrorNotice message={errorMessage(quote.error)} /> : null}
       {execute.error ? <ErrorNotice message={errorMessage(execute.error)} /> : null}
       {execute.data ? (

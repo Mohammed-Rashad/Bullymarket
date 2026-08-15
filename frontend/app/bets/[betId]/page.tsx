@@ -53,6 +53,7 @@ export default function BetDetailPage() {
   const canResolve = bet ? canResolveBet(bet, group) : false;
   const canEdit = bet ? canEditEndTime(bet, me.data?.id, group) : false;
   const canCancel = bet ? canCancelBet(bet, me.data?.id, group) : false;
+  const hasSidebar = canResolve || canEdit || canCancel;
 
   if (betQuery.isLoading) return <Loading label="Loading market…" />;
   if (betQuery.error) {
@@ -74,7 +75,6 @@ export default function BetDetailPage() {
             {bet.visibility === "public" ? "standalone public" : group?.name ?? "group"}
           </span>
           <span className={`status ${bet.status}`}>{bet.status}</span>
-          <span className="scope-chip">{bet.pricing_method.toUpperCase()}</span>
         </div>
         <h1>{bet.question}</h1>
         {bet.description ? <p className="muted">{bet.description}</p> : null}
@@ -96,7 +96,7 @@ export default function BetDetailPage() {
         </div>
       </Card>
 
-      <div className="content-grid">
+      <div className={hasSidebar ? "content-grid" : "stack"}>
         <section className="stack">
           {bet.status === "open" ? (
             <Card className="card-pad">
@@ -147,10 +147,6 @@ export default function BetDetailPage() {
                       {Math.abs(Number(trade.delta_shares)).toFixed(4)} {trade.side.toUpperCase()}
                     </strong>
                     <span>{Math.abs(Number(trade.cost)).toFixed(4)} pts</span>
-                    <span className="muted">
-                      house {Number(trade.house_cash_flow) >= 0 ? "+" : ""}
-                      {Number(trade.house_cash_flow).toFixed(4)}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -196,32 +192,10 @@ export default function BetDetailPage() {
           ) : null}
         </section>
 
-        <aside className="stack">
-          {bet.pricing_method === "lmsr" ? (
-            <Card className="card-pad">
-              <span className="eyebrow">House accounting</span>
-              <h2>Market exposure</h2>
-              <p className="muted">
-                Liquidity b: <strong>{Number(bet.b_liquidity).toFixed(2)}</strong>
-              </p>
-              <div className="leader-row">
-                <span className="leader-name">Reserved maximum loss</span>
-                <strong>{Number(bet.house_reserve).toFixed(2)}</strong>
-              </div>
-              <div className="leader-row">
-                <span className="leader-name">Current trade cash</span>
-                <strong>{Number(bet.house_cash_balance).toFixed(2)}</strong>
-              </div>
-              {bet.house_profit_loss !== null ? (
-                <div className="leader-row">
-                  <span className="leader-name">Realized house P/L</span>
-                  <strong>{Number(bet.house_profit_loss).toFixed(2)}</strong>
-                </div>
-              ) : null}
-            </Card>
-          ) : null}
-          {canResolve ? (
-            <Card className="card-pad">
+        {hasSidebar ? (
+          <aside className="stack">
+            {canResolve ? (
+              <Card className="card-pad">
               <span className="eyebrow">Settlement</span>
               <h2>Pick the winner</h2>
               <p className="muted">
@@ -246,11 +220,11 @@ export default function BetDetailPage() {
               {resolve.error ? (
                 <ErrorNotice message={errorMessage(resolve.error)} />
               ) : null}
-            </Card>
-          ) : null}
+              </Card>
+            ) : null}
 
-          {canEdit || canCancel ? (
-            <Card className="card-pad">
+            {canEdit || canCancel ? (
+              <Card className="card-pad">
               <span className="eyebrow">Market controls</span>
               {canEdit ? (
                 <>
@@ -301,9 +275,10 @@ export default function BetDetailPage() {
                   ) : null}
                 </>
               ) : null}
-            </Card>
-          ) : null}
-        </aside>
+              </Card>
+            ) : null}
+          </aside>
+        ) : null}
       </div>
     </div>
   );

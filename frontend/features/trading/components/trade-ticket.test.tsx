@@ -69,6 +69,7 @@ describe("TradeTicket", () => {
     expect(shares).toBeValid();
     expect(screen.getByRole("button", { name: "Buy shares" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Sell" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/LMSR/i)).not.toBeInTheDocument();
   });
 
   it("clears and disables the form after a successful purchase", () => {

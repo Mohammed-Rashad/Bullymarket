@@ -61,8 +61,9 @@ which recomputes the quote while holding the market lock.
   toggle because public bets do not belong to groups.
 - **Bet detail page**: question, current odds from the polled `/price` response, a
   buy-share form with the live quote described above, immutable trade audit, and market
-  house reserve/cash/realized-P&L. Selling remains implemented by the signed backend API
-  but is temporarily hidden from the client.
+  position details. Internal pricing-method and house-accounting figures are deliberately
+  omitted from this user-facing page. Selling remains implemented by the signed backend
+  API but is temporarily hidden from the client.
   It also lists who's bet on what (respecting visibility — if hidden, only
   show to allowed users), countdown to `end_time`, and — critically — once `status =
   closed`, the resolve UI visible only to the authorized resolver (a group admin for a
