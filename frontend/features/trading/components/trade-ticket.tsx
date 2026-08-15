@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 
 import { Button, ErrorNotice, Input } from "@/components/ui";
 import { errorMessage } from "@/lib/api-client";
@@ -11,7 +11,6 @@ import {
   useLmsrPrice,
   useLmsrQuote,
   useLmsrTrade,
-  useMyPositions,
 } from "../hooks";
 
 export function TradeTicket({ bet }: { bet: Bet }) {
@@ -24,49 +23,19 @@ export function TradeTicket({ bet }: { bet: Bet }) {
 
 function LmsrTradeTicket({ bet }: { bet: Bet }) {
   const [side, setSide] = useState<TradeSide>("yes");
-  const [action, setAction] = useState<"buy" | "sell">("buy");
   const [shares, setShares] = useState("10");
-  const signedShares = action === "sell" ? `-${shares || "0"}` : shares;
-  const quote = useLmsrQuote(bet.id, side, signedShares);
+  const quote = useLmsrQuote(bet.id, side, shares);
   const livePrice = useLmsrPrice(bet.id);
-  const positions = useMyPositions(bet.id);
   const execute = useLmsrTrade(bet.id);
-  const selectedOutcome = bet.outcomes[side === "yes" ? 0 : 1];
-  const heldShares = useMemo(
-    () =>
-      Number(
-        positions.data?.find(
-          (position) => position.outcome_id === selectedOutcome?.id,
-        )?.shares ?? 0,
-      ),
-    [positions.data, selectedOutcome?.id],
-  );
   const numericShares = Number(shares);
-  const invalidSell = action === "sell" && numericShares > heldShares;
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    execute.mutate({ side, shares: signedShares });
+    execute.mutate({ side, shares });
   }
 
   return (
     <form className="form-stack" onSubmit={submit}>
-      <div className="form-row">
-        <Button
-          className={action === "buy" ? "" : "secondary"}
-          onClick={() => setAction("buy")}
-          type="button"
-        >
-          Buy
-        </Button>
-        <Button
-          className={action === "sell" ? "" : "secondary"}
-          onClick={() => setAction("sell")}
-          type="button"
-        >
-          Sell
-        </Button>
-      </div>
       <div className="field">
         <label htmlFor="trade-side">Side</label>
         <select
@@ -88,12 +57,10 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
         </select>
       </div>
       <div className="field">
-        <label htmlFor="trade-shares">
-          Shares to {action} {action === "sell" ? `(held: ${heldShares.toFixed(4)})` : ""}
-        </label>
+        <label htmlFor="trade-shares">Shares to buy</label>
         <Input
           id="trade-shares"
-          min="0.00000001"
+          min="0.01"
           onChange={(event) => setShares(event.target.value)}
           required
           step="0.01"
@@ -103,7 +70,7 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
       </div>
       {quote.data ? (
         <div className="notice">
-          {action === "buy" ? "You pay" : "You receive"}: {" "}
+          You pay: {" "}
           <strong>{Math.abs(Number(quote.data.cost)).toFixed(4)} points</strong>
           <br />
           Average price: {(Number(quote.data.average_price) * 100).toFixed(2)}¢
@@ -113,9 +80,6 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
         </div>
       ) : null}
       {quote.isFetching ? <p className="muted">Updating LMSR quote…</p> : null}
-      {invalidSell ? (
-        <ErrorNotice message="You cannot sell more shares than you hold." />
-      ) : null}
       {quote.error ? <ErrorNotice message={errorMessage(quote.error)} /> : null}
       {execute.error ? <ErrorNotice message={errorMessage(execute.error)} /> : null}
       {execute.data ? (
@@ -129,13 +93,12 @@ function LmsrTradeTicket({ bet }: { bet: Bet }) {
         disabled={
           execute.isPending ||
           !quote.data ||
-          invalidSell ||
           numericShares <= 0 ||
           bet.status !== "open"
         }
         type="submit"
       >
-        {execute.isPending ? "Executing…" : `${action === "buy" ? "Buy" : "Sell"} shares`}
+        {execute.isPending ? "Executing…" : "Buy shares"}
       </Button>
     </form>
   );

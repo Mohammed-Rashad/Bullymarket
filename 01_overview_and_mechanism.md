@@ -152,7 +152,8 @@ winner is paid.
 - `GET /api/v1/house` — authenticated global house summary.
 
 The frontend never implements LMSR math. It debounces quote requests and polls the
-price endpoint every few seconds.
+price endpoint every few seconds. The signed API retains selling support, but the
+current UI temporarily sends positive purchase deltas only.
 
 ## 7. Required invariants and tests
 

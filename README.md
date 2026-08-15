@@ -29,7 +29,8 @@ maximum possible house loss is bounded by `b * ln(2)`, which is recorded as rese
 exposure when the market is created. Every trade, reserve, refund, payout, correction,
 and realized house P/L change is stored in an append-only audit ledger. House summaries
 are available per market, per exact group, and globally. Historical CPMM markets retain
-their original pricing tag and data.
+their original pricing tag and data. The backend retains signed selling support, while
+the current frontend intentionally exposes purchases only.
 
 ## Repository layout
 

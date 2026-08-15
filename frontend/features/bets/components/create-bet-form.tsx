@@ -104,7 +104,7 @@ export function CreateBetForm({
           min="0.01"
           onChange={(event) => setBLiquidity(event.target.value)}
           required
-          step="1"
+          step="0.01"
           type="number"
           value={bLiquidity}
         />

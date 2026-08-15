@@ -9,6 +9,7 @@ const links = [
   { href: "/groups", label: "My groups" },
   { href: "/public", label: "Public markets" },
   { href: "/leaderboard", label: "Leaderboard" },
+  { href: "/how-it-works", label: "How it works" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -71,4 +72,3 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

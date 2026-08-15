@@ -24,7 +24,8 @@ but should be environment/config-driven, not literals buried in code:
 **In v1:**
 - Binary (2-outcome) bets only.
 - LMSR pricing for every new market, with historical CPMM markets tagged and preserved.
-- Fractional buy and sell trades; selling is capped at the user's current shares.
+- Fractional buy and sell trades at the API layer; selling is capped at the user's
+  current shares. The current frontend temporarily presents purchases only.
 - Immutable trade and house ledgers, plus market/group/global house summaries.
 - Group-admin resolution plus correction/reversal support; the standalone public-bet
   resolver policy is the explicit open question below.

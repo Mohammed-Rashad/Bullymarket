@@ -343,6 +343,64 @@ h3,
   font-size: 1.25rem;
 }
 
+.explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.explanation-grid p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.explanation-lead {
+  grid-column: 1 / -1;
+  background: var(--ink);
+  color: white;
+}
+
+.explanation-lead p {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lmsr-example {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.lmsr-example div {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lmsr-example strong,
+.lmsr-example span {
+  display: block;
+}
+
+.lmsr-example strong {
+  font-family: var(--font-display), sans-serif;
+  font-size: 2rem;
+}
+
+.lmsr-example span {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.formula-card pre {
+  overflow-x: auto;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(23, 26, 31, 0.06);
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+
 .market-card {
   display: block;
   padding: 22px;
@@ -787,7 +845,8 @@ h3,
   }
 
   .form-row,
-  .odds-grid {
+  .odds-grid,
+  .explanation-grid {
     grid-template-columns: 1fr;
   }
 
@@ -801,4 +860,3 @@ h3,
     font-size: 0.74rem;
   }
 }
-
