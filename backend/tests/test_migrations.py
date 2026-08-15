@@ -34,6 +34,8 @@ def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
         "resolution_events",
         "bet_visibility_overrides",
         "bet_edit_events",
+        "trades",
+        "house_ledger_entries",
     } <= tables
     command.check(config)
 

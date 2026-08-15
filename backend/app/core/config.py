@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     access_token_minutes: int = 1440
     default_starting_balance: int = 1000
     default_liquidity_seed: int = 100
+    default_lmsr_liquidity: int = 100
     minimum_trade_amount: int = 1
     refill_amount: int = 500
     refill_interval_days: int = 7

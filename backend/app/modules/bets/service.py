@@ -8,9 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import Settings
 from app.core.exceptions import DomainError
 from app.core.logging import business_event
-from app.modules.amm import get_prices
+from app.core.money import money
+from app.modules.amm import get_prices, max_house_loss
+from app.modules.amm import prices as lmsr_prices
 from app.modules.bets import repository
-from app.modules.bets.models import Bet, BetStatus, BetVisibility, Outcome
+from app.modules.bets.models import (
+    Bet,
+    BetStatus,
+    BetVisibility,
+    Outcome,
+    PricingMethod,
+)
 from app.modules.bets.schemas import (
     BetResponse,
     CancellationResponse,
@@ -23,6 +31,8 @@ from app.modules.groups.service import (
     require_admin,
     require_membership,
 )
+from app.modules.house.models import HouseLedgerEntryType
+from app.modules.house.service import add_house_entry
 from app.modules.ledger.models import LedgerEntryType
 from app.modules.ledger.service import add_entry, get_bet_stakes
 
@@ -51,7 +61,19 @@ async def build_response(
     market_outcomes = outcomes or await repository.get_outcomes(session, bet.id)
     if len(market_outcomes) != 2:
         raise DomainError("invalid_market", "A v1 market must have exactly two outcomes", 500)
-    prices = get_prices(market_outcomes[0].pool_shares, market_outcomes[1].pool_shares)
+    if bet.pricing_method is PricingMethod.LMSR:
+        if bet.q_yes is None or bet.q_no is None or bet.b_liquidity is None:
+            raise DomainError("invalid_market", "LMSR state is incomplete", 500)
+        current_prices = lmsr_prices(bet.q_yes, bet.q_no, bet.b_liquidity)
+        price_yes = current_prices.yes
+        price_no = current_prices.no
+    else:
+        current_cpmm_prices = get_prices(
+            market_outcomes[0].pool_shares,
+            market_outcomes[1].pool_shares,
+        )
+        price_yes = current_cpmm_prices.yes
+        price_no = current_cpmm_prices.no
     return BetResponse(
         id=bet.id,
         group_id=bet.group_id,
@@ -64,13 +86,20 @@ async def build_response(
         resolved_outcome_id=bet.resolved_outcome_id,
         resolved_at=bet.resolved_at,
         created_at=bet.created_at,
+        pricing_method=bet.pricing_method,
+        b_liquidity=bet.b_liquidity,
+        q_yes=bet.q_yes,
+        q_no=bet.q_no,
+        house_reserve=bet.house_reserve,
+        house_cash_balance=bet.house_cash_balance,
+        house_profit_loss=bet.house_profit_loss,
         outcomes=[
             OutcomeResponse(
                 id=outcome.id,
                 label=outcome.label,
                 display_order=outcome.display_order,
                 pool_shares=outcome.pool_shares,
-                price=prices.yes if outcome.display_order == 0 else prices.no,
+                price=price_yes if outcome.display_order == 0 else price_no,
             )
             for outcome in market_outcomes
         ],
@@ -109,6 +138,10 @@ async def create_group_bet(
                     "invalid_visibility_member",
                     "Every visibility entry must be an active group member",
                 )
+    b_liquidity = money(
+        payload.b_liquidity or Decimal(settings.default_lmsr_liquidity)
+    )
+    reserve = money(max_house_loss(b_liquidity))
     bet, outcomes = await repository.create_bet(
         session,
         group_id=group_id,
@@ -119,7 +152,17 @@ async def create_group_bet(
         end_time=aware(payload.end_time),
         outcome_labels=payload.outcome_labels,
         liquidity_seed=Decimal(settings.default_liquidity_seed),
+        pricing_method=PricingMethod.LMSR,
+        b_liquidity=b_liquidity,
+        house_reserve=reserve,
         visible_to_user_ids=payload.visible_to_user_ids,
+    )
+    await add_house_entry(
+        session,
+        bet_id=bet.id,
+        group_id=bet.group_id,
+        entry_type=HouseLedgerEntryType.RESERVE,
+        reserve_delta=reserve,
     )
     return await build_response(session, bet, outcomes)
 
@@ -138,6 +181,10 @@ async def create_public_bet(
         )
     if aware(payload.end_time) <= utc_now():
         raise DomainError("invalid_end_time", "Bet end time must be in the future")
+    b_liquidity = money(
+        payload.b_liquidity or Decimal(settings.default_lmsr_liquidity)
+    )
+    reserve = money(max_house_loss(b_liquidity))
     bet, outcomes = await repository.create_bet(
         session,
         group_id=None,
@@ -148,7 +195,17 @@ async def create_public_bet(
         end_time=aware(payload.end_time),
         outcome_labels=payload.outcome_labels,
         liquidity_seed=Decimal(settings.default_liquidity_seed),
+        pricing_method=PricingMethod.LMSR,
+        b_liquidity=b_liquidity,
+        house_reserve=reserve,
         visible_to_user_ids=None,
+    )
+    await add_house_entry(
+        session,
+        bet_id=bet.id,
+        group_id=None,
+        entry_type=HouseLedgerEntryType.RESERVE,
+        reserve_delta=reserve,
     )
     return await build_response(session, bet, outcomes)
 
@@ -288,7 +345,10 @@ async def cancel_bet(
 
     total_refund = Decimal(0)
     stakes = await get_bet_stakes(session, bet.id)
+    refunded_users = 0
     for user_id, refund in stakes:
+        if refund <= 0:
+            continue
         await add_entry(
             session,
             user_id=user_id,
@@ -297,6 +357,25 @@ async def cancel_bet(
             bet_id=bet.id,
         )
         total_refund += refund
+        refunded_users += 1
+    if bet.pricing_method is PricingMethod.LMSR:
+        if total_refund != 0:
+            await add_house_entry(
+                session,
+                bet_id=bet.id,
+                group_id=bet.group_id,
+                entry_type=HouseLedgerEntryType.REFUND,
+                cash_delta=-money(total_refund),
+            )
+        await add_house_entry(
+            session,
+            bet_id=bet.id,
+            group_id=bet.group_id,
+            entry_type=HouseLedgerEntryType.RESERVE_RELEASE,
+            reserve_delta=-bet.house_reserve,
+        )
+        bet.house_cash_balance = Decimal(0)
+        bet.house_profit_loss = Decimal(0)
     cancelled_at = utc_now()
     bet.status = BetStatus.CANCELLED
     bet.cancelled_at = cancelled_at
@@ -306,12 +385,12 @@ async def cancel_bet(
         "bet_cancelled",
         bet_id=str(bet.id),
         actor_id=str(actor_id),
-        refunded_users=len(stakes),
+        refunded_users=refunded_users,
         refunded_points=str(total_refund),
     )
     return CancellationResponse(
         bet_id=bet.id,
-        refunded_users=len(stakes),
+        refunded_users=refunded_users,
         refunded_points=total_refund,
         cancelled_at=cancelled_at,
     )

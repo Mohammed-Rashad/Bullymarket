@@ -34,6 +34,11 @@ class BetStatus(StrEnum):
     CANCELLED = "cancelled"
 
 
+class PricingMethod(StrEnum):
+    CPMM = "cpmm"
+    LMSR = "lmsr"
+
+
 class BetEditType(StrEnum):
     END_TIME = "end_time"
 
@@ -78,6 +83,22 @@ class Bet(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolved_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
     liquidity_seed: Mapped[Decimal] = mapped_column(Numeric(24, 8))
+    pricing_method: Mapped[PricingMethod] = mapped_column(
+        Enum(
+            PricingMethod,
+            name="pricing_method",
+            values_callable=lambda enum: [e.value for e in enum],
+        ),
+        default=PricingMethod.LMSR,
+    )
+    b_liquidity: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    q_yes: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    q_no: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
+    house_reserve: Mapped[Decimal] = mapped_column(Numeric(24, 8), default=Decimal(0))
+    house_cash_balance: Mapped[Decimal] = mapped_column(
+        Numeric(24, 8), default=Decimal(0)
+    )
+    house_profit_loss: Mapped[Decimal | None] = mapped_column(Numeric(24, 8))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

@@ -13,6 +13,7 @@ from app.modules.bets.models import (
     BetVisibility,
     BetVisibilityOverride,
     Outcome,
+    PricingMethod,
 )
 
 
@@ -27,6 +28,9 @@ async def create_bet(
     end_time: datetime,
     outcome_labels: list[str],
     liquidity_seed: Decimal,
+    pricing_method: PricingMethod,
+    b_liquidity: Decimal | None,
+    house_reserve: Decimal,
     visible_to_user_ids: list[UUID] | None,
 ) -> tuple[Bet, list[Outcome]]:
     bet = Bet(
@@ -38,6 +42,12 @@ async def create_bet(
         status=BetStatus.OPEN,
         end_time=end_time,
         liquidity_seed=liquidity_seed,
+        pricing_method=pricing_method,
+        b_liquidity=b_liquidity,
+        q_yes=Decimal(0) if pricing_method is PricingMethod.LMSR else None,
+        q_no=Decimal(0) if pricing_method is PricingMethod.LMSR else None,
+        house_reserve=house_reserve,
+        house_cash_balance=Decimal(0),
     )
     session.add(bet)
     await session.flush()
@@ -45,7 +55,9 @@ async def create_bet(
         Outcome(
             bet_id=bet.id,
             label=label,
-            pool_shares=liquidity_seed,
+            pool_shares=(
+                Decimal(0) if pricing_method is PricingMethod.LMSR else liquidity_seed
+            ),
             display_order=index,
         )
         for index, label in enumerate(outcome_labels)

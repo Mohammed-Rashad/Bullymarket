@@ -1,9 +1,10 @@
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.trading.models import Position
+from app.modules.trading.models import Position, Trade
 
 
 async def get_position(
@@ -82,3 +83,33 @@ async def has_position_in_bets(
         )
         is not None
     )
+
+
+async def add_trade(session: AsyncSession, trade: Trade) -> Trade:
+    session.add(trade)
+    await session.flush()
+    return trade
+
+
+async def next_trade_sequence(session: AsyncSession, bet_id: UUID) -> int:
+    value = await session.scalar(
+        select(func.coalesce(func.max(Trade.sequence), 0)).where(Trade.bet_id == bet_id)
+    )
+    return int(value or 0) + 1
+
+
+async def list_trades(session: AsyncSession, bet_id: UUID) -> list[Trade]:
+    return list(
+        await session.scalars(
+            select(Trade)
+            .where(Trade.bet_id == bet_id)
+            .order_by(Trade.sequence)
+        )
+    )
+
+
+async def total_trade_cost(session: AsyncSession, bet_id: UUID) -> Decimal:
+    value = await session.scalar(
+        select(func.coalesce(func.sum(Trade.cost), 0)).where(Trade.bet_id == bet_id)
+    )
+    return Decimal(value or 0)

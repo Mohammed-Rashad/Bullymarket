@@ -15,6 +15,7 @@ class ResolutionResponse(BaseModel):
     is_correction: bool
     affected_users: int
     total_payout: Decimal
+    house_profit_loss: Decimal | None
     resolved_at: datetime
 
 
@@ -26,4 +27,3 @@ class ResolutionEventResponse(BaseModel):
     resolved_by: UUID
     is_correction: bool
     created_at: datetime
-

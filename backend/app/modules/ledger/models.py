@@ -15,6 +15,10 @@ class LedgerEntryType(StrEnum):
     PAYOUT = "payout"
     RESOLUTION_REVERSAL = "resolution_reversal"
     BET_REFUND = "bet_refund"
+    # LMSR trades use the historical database value so old ledger queries and
+    # PostgreSQL enum rows remain backward-compatible. Signed amounts distinguish
+    # buys (negative for the user) from sells (positive for the user).
+    MARKET_TRADE = "bet_placed"
 
 
 class LedgerEntry(Base):
@@ -40,4 +44,3 @@ class LedgerEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-

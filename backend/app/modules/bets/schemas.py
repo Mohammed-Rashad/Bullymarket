@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.modules.bets.models import BetStatus, BetVisibility
+from app.modules.bets.models import BetStatus, BetVisibility, PricingMethod
 
 
 class CreateBetRequest(BaseModel):
@@ -13,6 +13,12 @@ class CreateBetRequest(BaseModel):
     end_time: datetime
     outcome_labels: list[str]
     visible_to_user_ids: list[UUID] | None = None
+    b_liquidity: Decimal | None = Field(
+        default=None,
+        gt=0,
+        max_digits=20,
+        decimal_places=8,
+    )
 
     @field_validator("outcome_labels")
     @classmethod
@@ -55,6 +61,13 @@ class BetResponse(BaseModel):
     resolved_outcome_id: UUID | None
     resolved_at: datetime | None
     created_at: datetime
+    pricing_method: PricingMethod
+    b_liquidity: Decimal | None
+    q_yes: Decimal | None
+    q_no: Decimal | None
+    house_reserve: Decimal
+    house_cash_balance: Decimal
+    house_profit_loss: Decimal | None
     outcomes: list[OutcomeResponse]
 
 

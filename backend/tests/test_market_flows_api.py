@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -110,6 +111,23 @@ async def balance(client: AsyncClient, token: str) -> Decimal:
     return Decimal(str(response.json()["balance"]))
 
 
+async def trade(
+    client: AsyncClient,
+    token: str,
+    bet_id: str,
+    *,
+    side: str,
+    shares: str,
+) -> dict[str, Any]:
+    response = await client.post(
+        f"/api/v1/markets/{bet_id}/trade",
+        json={"side": side, "shares": shares},
+        headers=auth(token),
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 async def current_user_id(client: AsyncClient, token: str) -> str:
     response = await client.get("/api/v1/users/me", headers=auth(token))
     assert response.status_code == 200
@@ -132,39 +150,45 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
     yes_id = group_bet["outcomes"][0]["id"]
     no_id = group_bet["outcomes"][1]["id"]
 
-    too_small = await client.post(
+    legacy_handler = await client.post(
         f"/api/v1/bets/{group_bet['id']}/preview-buy",
-        json={"outcome_id": yes_id, "amount": "0.5"},
+        json={"outcome_id": yes_id, "amount": "1"},
         headers=auth(member_token),
     )
-    assert too_small.status_code == 400
-    assert too_small.json()["error"]["code"] == "trade_below_minimum"
+    assert legacy_handler.status_code == 409
+    assert legacy_handler.json()["error"]["code"] == "pricing_method_mismatch"
 
-    member_trade = await client.post(
-        f"/api/v1/bets/{group_bet['id']}/buy",
-        json={"outcome_id": yes_id, "amount": "20"},
-        headers=auth(member_token),
+    member_trade = await trade(
+        client,
+        member_token,
+        group_bet["id"],
+        side="yes",
+        shares="20",
     )
-    assert member_trade.status_code == 200, member_trade.text
-    member_yes_shares = Decimal(str(member_trade.json()["shares_out"]))
+    member_yes_shares = Decimal(str(member_trade["delta_shares"]))
+    member_cost = Decimal(str(member_trade["cost"]))
 
-    admin_trade = await client.post(
-        f"/api/v1/bets/{group_bet['id']}/buy",
-        json={"outcome_id": no_id, "amount": "20"},
-        headers=auth(admin_token),
+    admin_trade = await trade(
+        client,
+        admin_token,
+        group_bet["id"],
+        side="no",
+        shares="20",
     )
-    assert admin_trade.status_code == 200, admin_trade.text
-    admin_no_shares = Decimal(str(admin_trade.json()["shares_out"]))
+    admin_no_shares = Decimal(str(admin_trade["delta_shares"]))
+    admin_cost = Decimal(str(admin_trade["cost"]))
 
     public_bet = await create_public_bet(client, public_creator_token)
     public_yes_id = public_bet["outcomes"][0]["id"]
-    public_trade = await client.post(
-        f"/api/v1/bets/{public_bet['id']}/buy",
-        json={"outcome_id": public_yes_id, "amount": "10"},
-        headers=auth(member_token),
+    public_trade = await trade(
+        client,
+        member_token,
+        public_bet["id"],
+        side="yes",
+        shares="10",
     )
-    assert public_trade.status_code == 200
-    public_shares = Decimal(str(public_trade.json()["shares_out"]))
+    public_shares = Decimal(str(public_trade["delta_shares"]))
+    public_cost = Decimal(str(public_trade["cost"]))
 
     await expire_bet(group_bet["id"])
     await expire_bet(public_bet["id"])
@@ -183,7 +207,9 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
     )
     assert first_resolution.status_code == 200, first_resolution.text
     assert Decimal(str(first_resolution.json()["total_payout"])) == member_yes_shares
-    assert await balance(client, member_token) == Decimal(970) + member_yes_shares
+    assert await balance(client, member_token) == (
+        Decimal(1000) - member_cost - public_cost + member_yes_shares
+    )
 
     correction = await client.post(
         f"/api/v1/bets/{group_bet['id']}/resolve",
@@ -192,8 +218,8 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
     )
     assert correction.status_code == 200
     assert correction.json()["is_correction"] is True
-    assert await balance(client, member_token) == Decimal(970)
-    assert await balance(client, admin_token) == Decimal(980) + admin_no_shares
+    assert await balance(client, member_token) == Decimal(1000) - member_cost - public_cost
+    assert await balance(client, admin_token) == Decimal(1000) - admin_cost + admin_no_shares
 
     public_resolution = await client.post(
         f"/api/v1/bets/{public_bet['id']}/resolve",
@@ -212,8 +238,8 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
         for row in group_board.json()["entries"]
     }
     assert group_results == {
-        "Admin": admin_no_shares - Decimal(20),
-        "Member": Decimal(-20),
+        "Admin": admin_no_shares - admin_cost,
+        "Member": -member_cost,
     }
 
     public_board = await client.get(
@@ -226,7 +252,16 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
         row["display_name"]: Decimal(str(row["net_profit_loss"]))
         for row in public_board.json()["entries"]
     }
-    assert public_results == {"Member": public_shares - Decimal(10)}
+    assert public_results == {"Member": public_shares - public_cost}
+
+    group_house = await client.get(
+        f"/api/v1/groups/{group['id']}/house",
+        headers=auth(admin_token),
+    )
+    assert group_house.status_code == 200
+    assert Decimal(str(group_house.json()["realized_profit_loss"])) == (
+        member_cost + admin_cost - admin_no_shares
+    )
 
     events = await client.get(
         f"/api/v1/bets/{group_bet['id']}/resolution-events",
@@ -241,13 +276,15 @@ async def test_cancellation_refunds_every_stake(client: AsyncClient) -> None:
     other_token = await signup(client, "other@market.example", "Other")
     bet = await create_public_bet(client, creator_token, question="Cancel me?")
 
-    trade = await client.post(
-        f"/api/v1/bets/{bet['id']}/buy",
-        json={"outcome_id": bet["outcomes"][0]["id"], "amount": "25"},
-        headers=auth(creator_token),
+    placed = await trade(
+        client,
+        creator_token,
+        bet["id"],
+        side="yes",
+        shares="25",
     )
-    assert trade.status_code == 200
-    assert await balance(client, creator_token) == Decimal(975)
+    cost = Decimal(str(placed["cost"]))
+    assert await balance(client, creator_token) == Decimal(1000) - cost
 
     forbidden = await client.delete(
         f"/api/v1/bets/{bet['id']}",
@@ -260,7 +297,7 @@ async def test_cancellation_refunds_every_stake(client: AsyncClient) -> None:
         headers=auth(creator_token),
     )
     assert cancelled.status_code == 200
-    assert Decimal(str(cancelled.json()["refunded_points"])) == Decimal(25)
+    assert Decimal(str(cancelled.json()["refunded_points"])) == cost
     assert await balance(client, creator_token) == Decimal(1000)
 
     public_feed = await client.get("/api/v1/public-bets", headers=auth(other_token))
@@ -283,12 +320,13 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
     member_id = await current_user_id(client, member_token)
     existing_bet = await create_group_bet(client, admin_token, group["id"])
 
-    first_trade = await client.post(
-        f"/api/v1/bets/{existing_bet['id']}/buy",
-        json={"outcome_id": existing_bet["outcomes"][0]["id"], "amount": "5"},
-        headers=auth(member_token),
+    await trade(
+        client,
+        member_token,
+        existing_bet["id"],
+        side="yes",
+        shares="5",
     )
-    assert first_trade.status_code == 200
 
     removed = await client.delete(
         f"/api/v1/groups/{group['id']}/members/{member_id}",
@@ -315,8 +353,8 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
     )
     assert existing_access.status_code == 200
     continuing_trade = await client.post(
-        f"/api/v1/bets/{existing_bet['id']}/buy",
-        json={"outcome_id": existing_bet["outcomes"][0]["id"], "amount": "1"},
+        f"/api/v1/markets/{existing_bet['id']}/trade",
+        json={"side": "yes", "shares": "1"},
         headers=auth(member_token),
     )
     assert continuing_trade.status_code == 200
@@ -404,3 +442,125 @@ async def test_visibility_end_time_audit_and_refill(client: AsyncClient) -> None
         )
         assert count == 1
     assert await balance(client, admin_token) == Decimal(1500)
+
+
+@pytest.mark.asyncio
+async def test_lmsr_quotes_sells_trade_audit_and_house_cash_flow(
+    client: AsyncClient,
+) -> None:
+    trader_token = await signup(client, "lmsr-trader@test.com", "Trader")
+    bet = await create_public_bet(client, trader_token, question="LMSR audit?")
+    assert bet["pricing_method"] == "lmsr"
+    assert Decimal(str(bet["b_liquidity"])) == Decimal(100)
+    assert Decimal(str(bet["q_yes"])) == Decimal(0)
+    assert Decimal(str(bet["q_no"])) == Decimal(0)
+
+    unauthenticated_price = await client.get(
+        f"/api/v1/markets/{bet['id']}/price"
+    )
+    assert unauthenticated_price.status_code == 200
+    assert Decimal(str(unauthenticated_price.json()["price_yes"])) == Decimal("0.5")
+    assert Decimal(str(unauthenticated_price.json()["price_no"])) == Decimal("0.5")
+
+    buy_quote = await client.get(
+        f"/api/v1/markets/{bet['id']}/quote",
+        params={"side": "yes", "shares": "10"},
+    )
+    assert buy_quote.status_code == 200, buy_quote.text
+    buy = await trade(
+        client,
+        trader_token,
+        bet["id"],
+        side="yes",
+        shares="10",
+    )
+    assert buy["cost"] == buy_quote.json()["cost"]
+
+    sell_quote = await client.get(
+        f"/api/v1/markets/{bet['id']}/quote",
+        params={"side": "yes", "shares": "-4"},
+    )
+    assert sell_quote.status_code == 200
+    sell = await trade(
+        client,
+        trader_token,
+        bet["id"],
+        side="yes",
+        shares="-4",
+    )
+    assert Decimal(str(sell["cost"])) < 0
+    assert Decimal(str(sell["position_shares"])) == Decimal(6)
+
+    oversell = await client.post(
+        f"/api/v1/markets/{bet['id']}/trade",
+        json={"side": "yes", "shares": "-7"},
+        headers=auth(trader_token),
+    )
+    assert oversell.status_code == 409
+    assert oversell.json()["error"]["code"] == "insufficient_shares"
+
+    audits = await client.get(
+        f"/api/v1/markets/{bet['id']}/trades",
+        headers=auth(trader_token),
+    )
+    assert audits.status_code == 200
+    assert [Decimal(str(row["delta_shares"])) for row in audits.json()] == [
+        Decimal(10),
+        Decimal(-4),
+    ]
+    expected_cash = Decimal(str(buy["cost"])) + Decimal(str(sell["cost"]))
+    assert sum(
+        (Decimal(str(row["house_cash_flow"])) for row in audits.json()),
+        start=Decimal(0),
+    ) == expected_cash
+
+    house = await client.get(
+        f"/api/v1/bets/{bet['id']}/house",
+        headers=auth(trader_token),
+    )
+    assert house.status_code == 200
+    assert house.json()["trades"] == 2
+    assert Decimal(str(house.json()["trade_cash_flow"])) == expected_cash
+    assert Decimal(str(house.json()["current_cash_balance"])) == expected_cash
+    assert Decimal(str(house.json()["reserved_exposure"])) > 0
+
+    ledger = await client.get(
+        f"/api/v1/bets/{bet['id']}/house-ledger",
+        headers=auth(trader_token),
+    )
+    assert [row["entry_type"] for row in ledger.json()] == [
+        "reserve",
+        "trade",
+        "trade",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_concurrent_lmsr_trades_have_no_lost_update(
+    client: AsyncClient,
+) -> None:
+    trader_token = await signup(client, "concurrent@test.com", "Concurrent")
+    bet = await create_public_bet(client, trader_token, question="Concurrent LMSR?")
+
+    async def buy_five() -> Any:
+        return await client.post(
+            f"/api/v1/markets/{bet['id']}/trade",
+            json={"side": "yes", "shares": "5"},
+            headers=auth(trader_token),
+        )
+
+    first, second = await asyncio.gather(buy_five(), buy_five())
+    assert first.status_code == 200, first.text
+    assert second.status_code == 200, second.text
+
+    price = await client.get(f"/api/v1/markets/{bet['id']}/price")
+    assert Decimal(str(price.json()["q_yes"])) == Decimal(10)
+    audits = await client.get(
+        f"/api/v1/markets/{bet['id']}/trades",
+        headers=auth(trader_token),
+    )
+    assert [row["sequence"] for row in audits.json()] == [1, 2]
+    assert [Decimal(str(row["q_yes_after"])) for row in audits.json()] == [
+        Decimal(5),
+        Decimal(10),
+    ]

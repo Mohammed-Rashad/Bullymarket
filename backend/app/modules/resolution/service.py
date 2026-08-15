@@ -7,16 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import DomainError
 from app.core.logging import business_event
+from app.core.money import money
 from app.modules.bets import repository as bets_repository
-from app.modules.bets.models import BetStatus, BetVisibility
+from app.modules.bets.models import BetStatus, BetVisibility, PricingMethod
 from app.modules.bets.service import aware, refresh_time_status
 from app.modules.groups.service import require_admin
+from app.modules.house.models import HouseLedgerEntryType
+from app.modules.house.service import add_house_entry
 from app.modules.ledger.models import LedgerEntryType
 from app.modules.ledger.service import add_entry, get_unreversed_payouts
 from app.modules.resolution import repository
 from app.modules.resolution.models import ResolutionEvent
 from app.modules.resolution.schemas import ResolutionResponse
-from app.modules.trading.service import list_outcome_positions, money
+from app.modules.trading.repository import total_trade_cost
+from app.modules.trading.service import list_outcome_positions
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +58,7 @@ async def resolve_bet(
             409,
         )
 
+    reversed_payout_total = Decimal(0)
     if is_correction:
         for payout in await get_unreversed_payouts(session, bet.id):
             await add_entry(
@@ -64,6 +69,16 @@ async def resolve_bet(
                 bet_id=bet.id,
                 related_ledger_entry_id=payout.id,
             )
+            reversed_payout_total += payout.amount
+
+    if bet.pricing_method is PricingMethod.LMSR and reversed_payout_total > 0:
+        await add_house_entry(
+            session,
+            bet_id=bet.id,
+            group_id=bet.group_id,
+            entry_type=HouseLedgerEntryType.RESOLUTION_REVERSAL,
+            cash_delta=money(reversed_payout_total),
+        )
 
     positions = await list_outcome_positions(
         session,
@@ -83,6 +98,47 @@ async def resolve_bet(
             bet_id=bet.id,
         )
         total_payout += payout_amount
+
+    house_profit_loss: Decimal | None = None
+    if bet.pricing_method is PricingMethod.LMSR:
+        collected = money(await total_trade_cost(session, bet.id))
+        house_profit_loss = money(collected - total_payout)
+        if house_profit_loss < -bet.house_reserve - Decimal("0.00000001"):
+            raise DomainError(
+                "house_loss_bound_exceeded",
+                "LMSR settlement exceeded its funded loss bound",
+                500,
+            )
+        old_profit_loss = bet.house_profit_loss or Decimal(0)
+        bet.house_cash_balance = money(
+            bet.house_cash_balance + reversed_payout_total - total_payout
+        )
+        bet.house_profit_loss = house_profit_loss
+        if total_payout > 0:
+            await add_house_entry(
+                session,
+                bet_id=bet.id,
+                group_id=bet.group_id,
+                entry_type=HouseLedgerEntryType.PAYOUT,
+                cash_delta=-money(total_payout),
+            )
+        if not is_correction:
+            await add_house_entry(
+                session,
+                bet_id=bet.id,
+                group_id=bet.group_id,
+                entry_type=HouseLedgerEntryType.RESERVE_RELEASE,
+                reserve_delta=-bet.house_reserve,
+            )
+        pnl_delta = money(house_profit_loss - old_profit_loss)
+        if pnl_delta != 0:
+            await add_house_entry(
+                session,
+                bet_id=bet.id,
+                group_id=bet.group_id,
+                entry_type=HouseLedgerEntryType.PNL_ADJUSTMENT,
+                realized_pnl_delta=pnl_delta,
+            )
 
     if bet.resolved_at is None:
         bet.resolved_at = now
@@ -107,6 +163,9 @@ async def resolve_bet(
         resolver_id=str(resolver_id),
         affected_users=len(positions),
         total_payout=str(money(total_payout)),
+        house_profit_loss=(
+            str(house_profit_loss) if house_profit_loss is not None else None
+        ),
     )
     return ResolutionResponse(
         bet_id=bet.id,
@@ -114,6 +173,7 @@ async def resolve_bet(
         is_correction=is_correction,
         affected_users=len(positions),
         total_payout=money(total_payout),
+        house_profit_loss=house_profit_loss,
         resolved_at=bet.resolved_at,
     )
 
@@ -125,4 +185,3 @@ async def list_resolution_events(
 
     await get_visible_bet(session, bet_id=bet_id, user_id=user_id)
     return await repository.list_events(session, bet_id)
-

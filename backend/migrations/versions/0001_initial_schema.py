@@ -191,6 +191,15 @@ def upgrade() -> None:
             ["id"],
         )
 
+    position_check_constraints: tuple[sa.CheckConstraint, ...] = ()
+    if dialect_name == "sqlite":
+        position_check_constraints = (
+            sa.CheckConstraint(
+                "shares >= 0",
+                name="shares_nonnegative",
+            ),
+        )
+
     op.create_table(
         "positions",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -211,6 +220,7 @@ def upgrade() -> None:
             server_default=sa.text("CURRENT_TIMESTAMP"),
             nullable=False,
         ),
+        *position_check_constraints,
         sa.ForeignKeyConstraint(
             ["bet_id"], ["bets.id"], name="fk_positions_bet_id_bets"
         ),
