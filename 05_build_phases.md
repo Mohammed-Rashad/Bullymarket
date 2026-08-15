@@ -48,3 +48,41 @@ Commit: `phase 3: implement markets trading and leaderboards`
 
 Commit: `phase 4: add complete Next.js client`
 
+## Phase 5 — local deployment
+
+- Add a backend-owned Compose stack for PostgreSQL, migrations, and the API only; run
+  the Next.js client separately.
+- Gate: Compose configuration validates and the API waits for a successful migration.
+
+Commit: `phase 5: dockerize API and PostgreSQL`
+
+## Phase 6 — isolated LMSR engine
+
+- Add numerically stable binary LMSR cost, price, signed quote, and maximum-loss
+  functions without framework or database access.
+- Property-test reversibility, bounded loss, price conservation, and extreme ratios.
+- Retain CPMM math solely for historical markets.
+
+Commit: `phase 6: add verified LMSR pricing engine`
+
+## Phase 7 — transactional LMSR and house persistence
+
+- Add reversible ORM/migration changes for LMSR state, positions, immutable trades,
+  and the append-only house ledger.
+- Make every new market LMSR, reserve `b * ln(2)`, execute signed trades atomically,
+  pay resolution shares, support corrections/cancellation, and expose market/group/
+  global house summaries.
+- Gate: concurrency, migration, resolution-bound, accounting, backend lint, and type
+  checks pass.
+
+Commit: `phase 7: persist LMSR trades and house accounting`
+
+## Phase 8 — LMSR client and documentation
+
+- Add live price polling, debounced signed quotes, buy/sell controls, trade audit, market
+  house figures, and per-market liquidity creation input.
+- Replace the retired CPMM plan with the implemented LMSR mechanism, lifecycle, schema,
+  API contract, and house-accounting semantics.
+- Gate: full backend and frontend suites, migration checks, production build, and audit.
+
+Commit: `phase 8: ship LMSR trading UI and documentation`

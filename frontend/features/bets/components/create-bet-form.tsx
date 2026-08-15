@@ -22,6 +22,7 @@ export function CreateBetForm({
   const [yesLabel, setYesLabel] = useState("Yes");
   const [noLabel, setNoLabel] = useState("No");
   const [endTime, setEndTime] = useState("");
+  const [bLiquidity, setBLiquidity] = useState("100");
   const [restricted, setRestricted] = useState(false);
   const [visibleIds, setVisibleIds] = useState<string[]>([]);
 
@@ -32,6 +33,7 @@ export function CreateBetForm({
       description: description || undefined,
       end_time: new Date(endTime).toISOString(),
       outcome_labels: [yesLabel, noLabel],
+      b_liquidity: bLiquidity,
       ...(groupId && restricted ? { visible_to_user_ids: visibleIds } : {}),
     });
     setQuestion("");
@@ -95,6 +97,21 @@ export function CreateBetForm({
           value={endTime}
         />
       </div>
+      <div className="field">
+        <label htmlFor="b-liquidity">LMSR liquidity (b)</label>
+        <Input
+          id="b-liquidity"
+          min="0.01"
+          onChange={(event) => setBLiquidity(event.target.value)}
+          required
+          step="1"
+          type="number"
+          value={bLiquidity}
+        />
+        <small className="muted">
+          Higher values make prices move more slowly. Maximum house loss is b × ln(2).
+        </small>
+      </div>
       {groupId && members.length ? (
         <div className="field">
           <label>
@@ -138,4 +155,3 @@ export function CreateBetForm({
     </form>
   );
 }
-

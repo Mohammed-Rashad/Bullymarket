@@ -45,8 +45,9 @@ app/
     users/          # user profile, points balance (reads the ledger)
     groups/          # groups, membership, admin roles, invites
     bets/          # bet creation, visibility rules, listing, status transitions
-    amm/          # the pure math from 01_overview_and_mechanism.md §3 — NO db access
-    trading/          # the "place a bet" flow: calls amm + ledger + positions together
+    amm/          # pure LMSR and historical CPMM math — NO db access
+    trading/          # signed LMSR trades: AMM + balances + positions + audit
+    house/          # market/group/global house accounting read models
     resolution/          # resolving bets, corrections, resolution_events
     ledger/          # the ledger_entries table: append entries, compute balances
     leaderboard/          # read-only aggregation queries over ledger + groups + bets
@@ -67,10 +68,11 @@ app/
 
 This is the most important module boundary in the whole system, and it's worth being
 explicit about why. `amm/` contains **only** the pure functions from
-`01_overview_and_mechanism.md` §3.2/3.3 — `buy_shares(pool_yes, pool_no, amount, side)
--> (new_pool_yes, new_pool_no, shares_out)` and `get_prices(pool_yes, pool_no) ->
-(price_yes, price_no)`. No database session, no FastAPI dependency, no imports from any
-other module. Pure math in, pure math out.
+`01_overview_and_mechanism.md` §3 — stable `cost`, `prices`, `quote_trade`, and
+`max_house_loss` functions over `Decimal` quantities. The old CPMM functions remain
+isolated only so historical markets stay readable. There is no database session,
+FastAPI dependency, or import from another application module: pure math in, pure math
+out.
 
 This isn't just tidiness. It's what makes the property-based tests in §3.8 possible to
 run in milliseconds with no test database, no fixtures, no setup — which matters because
@@ -82,10 +84,10 @@ DB writes, every test of the math would also be a test of the database layer, an
 failure could be either — which is exactly the ambiguity that makes bugs slow to find.
 Keep this boundary strict.
 
-The `trading` module is the one that *uses* `amm`'s pure functions and *then* does the
-DB work (updating `outcomes.pool_shares`, inserting into `positions` and
-`ledger_entries`, all in one transaction). `trading` is where the math meets the
-database; `amm` never touches the database itself.
+The `trading` module uses those pure functions and then, in one transaction, updates
+`q_yes`/`q_no`, the position and user ledger, inserts an immutable `trade`, and appends
+the matching house-ledger event. `trading` is where math meets persistence; `amm` never
+touches the database itself.
 
 ### 2.2 Why `ledger` is separate from `users`
 
@@ -164,15 +166,15 @@ concretely, not just "add print statements."
   handling that request includes it. This is what makes "find every log line related to
   this one bug report" possible.
 - **Every `trading` and `resolution` action logs a structured event with full context**
-  — not just "bet placed" but `{"event": "bet_placed", "user_id": ..., "bet_id": ...,
-  "outcome_id": ..., "amount": ..., "shares_out": ..., "pool_before": {...},
-  "pool_after": {...}}`. This is the highest-value logging in the whole system: if a
+  — not just "trade executed" but `{"event": "lmsr_trade", "user_id": ..., "bet_id":
+  ..., "side": ..., "delta_shares": ..., "cost": ..., "q_before": {...}, "q_after":
+  {...}}`. This is the highest-value logging in the whole system: if a
   balance ever looks wrong, these log lines plus the `ledger_entries` table are what let
   you reconstruct exactly what happened, in order, without guessing. Apply the same
   principle to `resolution` events (log old/new outcome, affected user count, total
   payout) and to `refill` job runs (log how many users were refilled and by how much,
   each run).
-- **Log at module boundaries.** When `trading.service` calls `amm.buy_shares(...)`, log
+- **Log at module boundaries.** When `trading.service` calls `amm.quote_trade(...)`, log
   the inputs and outputs of that call. This directly supports the module-boundary
   principle from Section 1 — if a bug is on the math side vs. the persistence side, the
   boundary log line tells you which, because you can see exactly what came out of the
@@ -194,12 +196,16 @@ concretely, not just "add print statements."
 - Versioned prefix, e.g. `/api/v1/...`, even though there's only one version now — costs
   nothing today and avoids a painful migration later if the API shape ever needs to
   change while an old frontend build is still in use.
-- Every mutating endpoint (`POST`, `PATCH`, `DELETE`) that touches money/points (placing
-  a bet, resolving, correcting) must run inside a single DB transaction covering every
-  write it makes. Use FastAPI's dependency injection to hand each request a session
-  scoped to that request, with commit/rollback handled by the dependency, not scattered
-  manual `commit()` calls inside service functions — one clear place where transactions
-  begin and end, not several.
+- Every mutating endpoint (`POST`, `PATCH`, `DELETE`) that touches money/points must run
+  inside a single DB transaction covering user and house writes. Production PostgreSQL
+  takes a row lock on the market before recomputing the quote. The request-scoped DB
+  dependency commits or rolls back. SQLite development mode is the deliberate exception:
+  it uses a process-local market lock and commits before releasing that lock because
+  SQLite ignores `SELECT FOR UPDATE`.
+- LMSR routes are explicit: unauthenticated `GET /markets/{id}/price`, read-only
+  `GET /markets/{id}/quote`, atomic `POST /markets/{id}/trade`, and ordered
+  `GET /markets/{id}/trades`. House routes expose a single market, exact group, or all
+  LMSR markets. Historical CPMM endpoints reject LMSR markets rather than mixing math.
 - Keep group and public APIs structurally separate:
   `/api/v1/groups/{group_id}/bets` and
   `/api/v1/groups/{group_id}/leaderboard` are group-scoped, while

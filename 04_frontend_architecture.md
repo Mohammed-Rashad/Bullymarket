@@ -25,7 +25,7 @@ features/                    # mirrors backend modules
     components/
   groups/
   bets/
-  trading/          # the buy-shares UI flow + odds display
+  trading/          # signed LMSR trade flow, quotes, prices, and audit
   leaderboard/
 components/          # truly generic, cross-feature UI (Button, Card, Modal — no business logic)
 lib/
@@ -42,17 +42,16 @@ principle as the backend's "call the service, don't reach into internals" rule i
 
 ## 2. Never reimplement the AMM math on the frontend
 
-This is worth stating explicitly because it's a tempting shortcut: when showing "if I bet
-X points, I'll get approximately Y shares" as a live preview while the user types an
-amount, **do not port the §3.2 formula into TypeScript and compute it client-side.** The
+This is worth stating explicitly because it's a tempting shortcut: when showing the
+cost and price impact for a signed share order, **do not port the LMSR formula into
+TypeScript and compute it client-side.** The
 backend is the single source of truth for this math (that's the entire point of the
 `amm` module's isolation in `03_backend_architecture.md` §2.1 — one implementation, one
 set of tests, one place a bug can hide). Instead, add a lightweight `/preview` endpoint
-(`POST /api/v1/bets/{id}/preview-buy`) that takes `amount` and `side` and returns the
-same computation the real buy endpoint would produce, without committing anything to the
-database. The frontend calls this on debounce as the user types. This costs one small
-extra backend endpoint and saves the much worse outcome of frontend and backend math
-silently drifting apart after one of them gets a bugfix the other doesn't.
+(`GET /api/v1/markets/{id}/quote?side=yes&shares=N`) that returns the exact signed cost,
+average fill price, and post-trade marginal prices without writing. The frontend calls
+it on debounce as the user changes side, action, or shares. Execution calls `/trade`,
+which recomputes the quote while holding the market lock.
 
 ## 3. Key pages/flows
 
@@ -60,9 +59,10 @@ silently drifting apart after one of them gets a bugfix the other doesn't.
   `02_data_model.md`'s `bet_visibility_overrides`), group leaderboard preview, "create
   bet" action. Creating here always creates a group bet; there is no "make public"
   toggle because public bets do not belong to groups.
-- **Bet detail page**: question, current odds for each outcome (from the backend's
-  computed price, never recomputed client-side), a buy-shares form with the live preview
-  described above, list of who's bet on what (respecting visibility — if hidden, only
+- **Bet detail page**: question, current odds from the polled `/price` response, a
+  buy/sell share form with the live quote described above, a sell cap based on the
+  current holding, immutable trade audit, and market house reserve/cash/realized-P&L.
+  It also lists who's bet on what (respecting visibility — if hidden, only
   show to allowed users), countdown to `end_time`, and — critically — once `status =
   closed`, the resolve UI visible only to the authorized resolver (a group admin for a
   group bet), and once `status = resolved`, the payout breakdown and the

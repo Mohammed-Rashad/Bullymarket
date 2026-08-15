@@ -11,6 +11,26 @@ The important product invariant is enforced from the database through the UI:
 - Refills and overall wallet balances never determine leaderboard rank.
 - A bet is either group-scoped or public; it can never be both.
 
+## LMSR pricing and house accounting
+
+Every new binary market uses a Logarithmic Market Scoring Rule (LMSR), so the platform
+is the counterparty and a user never waits for a matching order. A market stores net
+YES/NO shares `q_yes`, `q_no` and a fixed liquidity value `b`:
+
+```text
+C(q_yes, q_no) = b * ln(exp(q_yes / b) + exp(q_no / b))
+P_yes = exp(q_yes / b) / (exp(q_yes / b) + exp(q_no / b))
+trade_cost = C(q_after) - C(q_before)
+```
+
+Positive shares buy; negative shares sell existing holdings. The signed cost is paid
+from the user to the house, and a winning share redeems for exactly 1 point. The
+maximum possible house loss is bounded by `b * ln(2)`, which is recorded as reserved
+exposure when the market is created. Every trade, reserve, refund, payout, correction,
+and realized house P/L change is stored in an append-only audit ledger. House summaries
+are available per market, per exact group, and globally. Historical CPMM markets retain
+their original pricing tag and data.
+
 ## Repository layout
 
 - `backend/` — async FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL, pytest
@@ -119,8 +139,8 @@ never substitutes `Base.metadata.create_all()`.
 
 ## Plan documents
 
-1. [`01_overview_and_mechanism.md`](01_overview_and_mechanism.md) — product behavior and
-   CPMM math
+1. [`01_overview_and_mechanism.md`](01_overview_and_mechanism.md) — product behavior,
+   LMSR math, and house accounting
 2. [`02_data_model.md`](02_data_model.md) — relational schema and leaderboard rules
 3. [`03_backend_architecture.md`](03_backend_architecture.md) — API module boundaries
 4. [`04_frontend_architecture.md`](04_frontend_architecture.md) — client structure

@@ -20,7 +20,7 @@ import {
 } from "@/features/bets/hooks";
 import { useGroups } from "@/features/groups/hooks";
 import { TradeTicket } from "@/features/trading/components/trade-ticket";
-import { useMyPositions } from "@/features/trading/hooks";
+import { useMyPositions, useTrades } from "@/features/trading/hooks";
 import { useMe } from "@/features/auth/hooks";
 import { errorMessage } from "@/lib/api-client";
 
@@ -32,6 +32,7 @@ export default function BetDetailPage() {
   const me = useMe();
   const groups = useGroups();
   const positions = useMyPositions(betId);
+  const trades = useTrades(betId);
   const resolutionEvents = useResolutionEvents(betId);
   const editEvents = useEditEvents(betId);
   const resolve = useResolveBet(betId);
@@ -69,6 +70,7 @@ export default function BetDetailPage() {
             {bet.visibility === "public" ? "standalone public" : group?.name ?? "group"}
           </span>
           <span className={`status ${bet.status}`}>{bet.status}</span>
+          <span className="scope-chip">{bet.pricing_method.toUpperCase()}</span>
         </div>
         <h1>{bet.question}</h1>
         {bet.description ? <p className="muted">{bet.description}</p> : null}
@@ -80,7 +82,11 @@ export default function BetDetailPage() {
             <div className="odds-card" key={outcome.id}>
               <span>{outcome.label}</span>
               <strong>{(Number(outcome.price) * 100).toFixed(1)}%</strong>
-              <small>{Number(outcome.pool_shares).toFixed(2)} pool shares</small>
+              <small>
+                {bet.pricing_method === "lmsr"
+                  ? `${Number(outcome.pool_shares).toFixed(2)} shares issued`
+                  : `${Number(outcome.pool_shares).toFixed(2)} pool shares`}
+              </small>
             </div>
           ))}
         </div>
@@ -114,7 +120,7 @@ export default function BetDetailPage() {
                       <strong className="leader-name">{outcome?.label}</strong>
                       <span>{Number(position.shares).toFixed(4)} shares</span>
                       <span className="muted">
-                        {Number(position.points_spent).toFixed(2)} pts staked
+                        {Number(position.points_spent).toFixed(2)} pts net cost
                       </span>
                     </div>
                   );
@@ -124,6 +130,28 @@ export default function BetDetailPage() {
               <p className="muted">You do not hold a position in this market.</p>
             )}
           </Card>
+
+          {bet.pricing_method === "lmsr" && trades.data?.length ? (
+            <Card className="card-pad">
+              <span className="eyebrow">Immutable audit</span>
+              <h2>Trade history</h2>
+              <div className="stack">
+                {trades.data.map((trade) => (
+                  <div className="leader-row" key={trade.id}>
+                    <strong className="leader-name">
+                      #{trade.sequence} · {Number(trade.delta_shares) > 0 ? "Bought" : "Sold"}{" "}
+                      {Math.abs(Number(trade.delta_shares)).toFixed(4)} {trade.side.toUpperCase()}
+                    </strong>
+                    <span>{Math.abs(Number(trade.cost)).toFixed(4)} pts</span>
+                    <span className="muted">
+                      house {Number(trade.house_cash_flow) >= 0 ? "+" : ""}
+                      {Number(trade.house_cash_flow).toFixed(4)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : null}
 
           {resolutionEvents.data?.length ? (
             <Card className="card-pad">
@@ -165,6 +193,29 @@ export default function BetDetailPage() {
         </section>
 
         <aside className="stack">
+          {bet.pricing_method === "lmsr" ? (
+            <Card className="card-pad">
+              <span className="eyebrow">House accounting</span>
+              <h2>Market exposure</h2>
+              <p className="muted">
+                Liquidity b: <strong>{Number(bet.b_liquidity).toFixed(2)}</strong>
+              </p>
+              <div className="leader-row">
+                <span className="leader-name">Reserved maximum loss</span>
+                <strong>{Number(bet.house_reserve).toFixed(2)}</strong>
+              </div>
+              <div className="leader-row">
+                <span className="leader-name">Current trade cash</span>
+                <strong>{Number(bet.house_cash_balance).toFixed(2)}</strong>
+              </div>
+              {bet.house_profit_loss !== null ? (
+                <div className="leader-row">
+                  <span className="leader-name">Realized house P/L</span>
+                  <strong>{Number(bet.house_profit_loss).toFixed(2)}</strong>
+                </div>
+              ) : null}
+            </Card>
+          ) : null}
           {canResolve && (bet.status === "closed" || bet.status === "resolved") ? (
             <Card className="card-pad">
               <span className="eyebrow">
@@ -247,4 +298,3 @@ export default function BetDetailPage() {
     </div>
   );
 }
-

@@ -18,6 +18,13 @@ const bet: Bet = {
   resolved_outcome_id: null,
   resolved_at: null,
   created_at: "2029-12-01T00:00:00Z",
+  pricing_method: "lmsr",
+  b_liquidity: "100",
+  q_yes: "20",
+  q_no: "10",
+  house_reserve: "69.31471806",
+  house_cash_balance: "5",
+  house_profit_loss: null,
   outcomes: [
     {
       id: "yes",
@@ -48,4 +55,3 @@ describe("MarketCard", () => {
     expect(screen.getByRole("link")).toHaveAttribute("href", "/bets/bet-1");
   });
 });
-

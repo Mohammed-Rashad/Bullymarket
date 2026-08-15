@@ -1,5 +1,7 @@
 export type BetVisibility = "group" | "public";
 export type BetStatus = "open" | "closed" | "resolved" | "cancelled";
+export type PricingMethod = "cpmm" | "lmsr";
+export type TradeSide = "yes" | "no";
 export type LeaderboardWindow = "weekly" | "biweekly" | "monthly" | "all_time";
 
 export interface UserProfile {
@@ -50,6 +52,13 @@ export interface Bet {
   resolved_outcome_id: string | null;
   resolved_at: string | null;
   created_at: string;
+  pricing_method: PricingMethod;
+  b_liquidity: string | null;
+  q_yes: string | null;
+  q_no: string | null;
+  house_reserve: string;
+  house_cash_balance: string;
+  house_profit_loss: string | null;
   outcomes: Outcome[];
 }
 
@@ -70,6 +79,49 @@ export interface BuyPreview {
 export interface TradeResult extends BuyPreview {
   remaining_balance: string;
   position_shares: string;
+}
+
+export interface LmsrPrice {
+  bet_id: string;
+  price_yes: string;
+  price_no: string;
+  q_yes: string;
+  q_no: string;
+  b_liquidity: string;
+}
+
+export interface LmsrQuote extends LmsrPrice {
+  side: TradeSide;
+  delta_shares: string;
+  cost: string;
+  average_price: string;
+  q_yes_after: string;
+  q_no_after: string;
+  price_yes_after: string;
+  price_no_after: string;
+}
+
+export interface LmsrTradeResult extends LmsrQuote {
+  trade_id: string;
+  outcome_id: string;
+  remaining_balance: string;
+  position_shares: string;
+  house_cash_flow: string;
+}
+
+export interface TradeAudit {
+  id: string;
+  bet_id: string;
+  user_id: string;
+  outcome_id: string;
+  sequence: number;
+  side: TradeSide;
+  delta_shares: string;
+  cost: string;
+  house_cash_flow: string;
+  q_yes_after: string;
+  q_no_after: string;
+  created_at: string;
 }
 
 export interface LeaderboardEntry {
@@ -108,4 +160,5 @@ export interface CreateBetInput {
   end_time: string;
   outcome_labels: [string, string];
   visible_to_user_ids?: string[];
+  b_liquidity?: string;
 }
