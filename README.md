@@ -26,8 +26,9 @@ trade_cost = C(q_after) - C(q_before)
 Positive shares buy; negative shares sell existing holdings. The signed cost is paid
 from the user to the house, and a winning share redeems for exactly 1 point. The
 maximum possible house loss is bounded by `b * ln(2)`, which is recorded as reserved
-exposure when the market is created. Every trade, reserve, refund, payout, correction,
-and realized house P/L change is stored in an append-only audit ledger. House summaries
+exposure when the market is created. Every trade, reserve, refund, payout, and realized
+house P/L change is stored in an append-only audit ledger. A resolution is final and
+cannot be corrected or replaced. House summaries
 are available per market, per exact group, and globally. Historical CPMM markets retain
 their original pricing tag and data. The backend retains signed selling support, while
 the current frontend intentionally exposes purchases only.

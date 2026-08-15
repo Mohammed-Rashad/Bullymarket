@@ -27,8 +27,8 @@ but should be environment/config-driven, not literals buried in code:
 - Fractional buy and sell trades at the API layer; selling is capped at the user's
   current shares. The current frontend temporarily presents purchases only.
 - Immutable trade and house ledgers, plus market/group/global house summaries.
-- Group-admin resolution plus correction/reversal support; the standalone public-bet
-  resolver policy is the explicit open question below.
+- Group-admin resolution is a one-time final action. Standalone public resolution keeps
+  its existing platform policy, but it is equally immutable after settlement.
 - Mutually exclusive group bets and standalone public bets, plus per-user allow-lists
   for group bets only.
 - Weekly/bi-weekly/monthly/all-time realized-profit/loss leaderboards: each group uses

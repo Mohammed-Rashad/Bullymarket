@@ -65,7 +65,8 @@ export default function HowItWorksPage() {
           <p>
             The worst possible house loss for a binary market is <code>b × ln(2)</code>.
             BullyMarket records that reserve at creation and separately audits every
-            trade, payout, refund, correction, and final house profit or loss.
+            trade, payout, refund, and final house profit or loss. Once resolved, the
+            winning side cannot be changed.
           </p>
         </Card>
 

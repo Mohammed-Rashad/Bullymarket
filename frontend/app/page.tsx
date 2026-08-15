@@ -15,8 +15,7 @@ export default function HomePage() {
         <h1>Put points behind your boldest calls.</h1>
         <p>
           Create a market for the debates your friends never settle. Prices move
-          as the room picks a side, and every win, loss, and correction stays
-          auditable.
+          as the room picks a side, and every trade and final result stays auditable.
         </p>
         <div className="hero-actions">
           <Link className="button" href={token ? "/groups" : "/signup"}>
@@ -59,4 +58,3 @@ export default function HomePage() {
     </section>
   );
 }
-

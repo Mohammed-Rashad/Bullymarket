@@ -48,7 +48,7 @@ app/
     amm/          # pure LMSR and historical CPMM math — NO db access
     trading/          # signed LMSR trades: AMM + balances + positions + audit
     house/          # market/group/global house accounting read models
-    resolution/          # resolving bets, corrections, resolution_events
+    resolution/          # one-time final settlement and resolution_events
     ledger/          # the ledger_entries table: append entries, compute balances
     leaderboard/          # read-only aggregation queries over ledger + groups + bets
     refill/          # the scheduled job that adds the periodic points refill
@@ -104,9 +104,10 @@ it.
 ### 2.3 Why `resolution` is separate from `bets`
 
 `bets` owns bet creation, editing, visibility, and listing — normal CRUD. `resolution`
-owns the specific, higher-stakes action of marking a winner and running payouts,
-including the correction/reversal flow from §3.5. Splitting these means the
-higher-risk code (money moves, audit trail, corrections) lives in a small, dedicated
+owns the specific, higher-stakes action of marking a winner and running payouts.
+Settlement is immutable: a resolved bet rejects every later resolution request.
+Splitting these means the
+higher-risk code (money moves and the immutable audit trail) lives in a small, dedicated
 module that's easy to review completely, instead of being one function buried inside a
 much larger `bets` module alongside routine CRUD.
 
@@ -171,7 +172,7 @@ concretely, not just "add print statements."
   {...}}`. This is the highest-value logging in the whole system: if a
   balance ever looks wrong, these log lines plus the `ledger_entries` table are what let
   you reconstruct exactly what happened, in order, without guessing. Apply the same
-  principle to `resolution` events (log old/new outcome, affected user count, total
+  principle to `resolution` events (log final outcome, affected user count, total
   payout) and to `refill` job runs (log how many users were refilled and by how much,
   each run).
 - **Log at module boundaries.** When `trading.service` calls `amm.quote_trade(...)`, log
@@ -185,8 +186,8 @@ concretely, not just "add print statements."
   this by accident, not just by code review.
 - **Log levels, kept simple:** `INFO` for the structured business events described
   above (bet placed, resolved, refilled — the events you'd want to replay in a bug
-  investigation); `WARNING` for handled-but-notable situations (a resolution correction
-  happened, a refill job found zero eligible users); `ERROR` for anything caught by an
+  investigation); `WARNING` for handled-but-notable situations (a refill job found zero
+  eligible users); `ERROR` for anything caught by an
   exception handler that represents a real bug or failure. Resist the urge to add more
   granular levels — more categories is more decisions to get right and more noise, not
   more signal, for a project this size.

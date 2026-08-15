@@ -135,7 +135,7 @@ async def current_user_id(client: AsyncClient, token: str) -> str:
 
 
 @pytest.mark.asyncio
-async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
+async def test_trading_resolution_is_final_and_scope_isolated_leaderboards(
     client: AsyncClient,
 ) -> None:
     admin_token = await signup(client, "admin@market.example", "Admin")
@@ -175,7 +175,6 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
         side="no",
         shares="20",
     )
-    admin_no_shares = Decimal(str(admin_trade["delta_shares"]))
     admin_cost = Decimal(str(admin_trade["cost"]))
 
     public_bet = await create_public_bet(client, public_creator_token)
@@ -192,6 +191,13 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
 
     await expire_bet(group_bet["id"])
     await expire_bet(public_bet["id"])
+
+    forbidden_end_time_edit = await client.patch(
+        f"/api/v1/bets/{group_bet['id']}/end-time",
+        json={"end_time": (datetime.now(UTC) + timedelta(days=2)).isoformat()},
+        headers=auth(member_token),
+    )
+    assert forbidden_end_time_edit.status_code == 403
 
     forbidden = await client.post(
         f"/api/v1/bets/{group_bet['id']}/resolve",
@@ -211,15 +217,25 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
         Decimal(1000) - member_cost - public_cost + member_yes_shares
     )
 
-    correction = await client.post(
+    resolved_end_time_edit = await client.patch(
+        f"/api/v1/bets/{group_bet['id']}/end-time",
+        json={"end_time": (datetime.now(UTC) + timedelta(days=2)).isoformat()},
+        headers=auth(admin_token),
+    )
+    assert resolved_end_time_edit.status_code == 409
+    assert resolved_end_time_edit.json()["error"]["code"] == "bet_immutable"
+
+    second_resolution = await client.post(
         f"/api/v1/bets/{group_bet['id']}/resolve",
         json={"outcome_id": no_id},
         headers=auth(admin_token),
     )
-    assert correction.status_code == 200
-    assert correction.json()["is_correction"] is True
-    assert await balance(client, member_token) == Decimal(1000) - member_cost - public_cost
-    assert await balance(client, admin_token) == Decimal(1000) - admin_cost + admin_no_shares
+    assert second_resolution.status_code == 409
+    assert second_resolution.json()["error"]["code"] == "bet_already_resolved"
+    assert await balance(client, member_token) == (
+        Decimal(1000) - member_cost - public_cost + member_yes_shares
+    )
+    assert await balance(client, admin_token) == Decimal(1000) - admin_cost
 
     public_resolution = await client.post(
         f"/api/v1/bets/{public_bet['id']}/resolve",
@@ -238,8 +254,8 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
         for row in group_board.json()["entries"]
     }
     assert group_results == {
-        "Admin": admin_no_shares - admin_cost,
-        "Member": -member_cost,
+        "Admin": -admin_cost,
+        "Member": member_yes_shares - member_cost,
     }
 
     public_board = await client.get(
@@ -260,14 +276,14 @@ async def test_trading_resolution_correction_and_scope_isolated_leaderboards(
     )
     assert group_house.status_code == 200
     assert Decimal(str(group_house.json()["realized_profit_loss"])) == (
-        member_cost + admin_cost - admin_no_shares
+        member_cost + admin_cost - member_yes_shares
     )
 
     events = await client.get(
         f"/api/v1/bets/{group_bet['id']}/resolution-events",
         headers=auth(member_token),
     )
-    assert [event["is_correction"] for event in events.json()] == [False, True]
+    assert [event["is_correction"] for event in events.json()] == [False]
 
 
 @pytest.mark.asyncio

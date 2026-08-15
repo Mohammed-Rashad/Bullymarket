@@ -67,7 +67,7 @@ zero. Positions are the fast current-state view; immutable trades are the audit 
 - database value `bet_placed`: signed LMSR trade movement as well as historical CPMM
   buys (negative buy cost, positive sell proceeds);
 - `payout`: positive winning-share redemption;
-- `resolution_reversal`: exact negative reference to an earlier payout;
+- `resolution_reversal`: retained only for backward-compatible historical rows;
 - `bet_refund`: cancellation credit.
 
 Leaderboards include only trade/payout/reversal rows belonging to resolved bets in the
@@ -102,10 +102,11 @@ per-market `sequence`, and three independent signed dimensions:
 
 - `cash_delta`: money received by the house is positive; paid by the house is negative;
 - `reserve_delta`: positive when exposure is reserved, negative when released;
-- `realized_pnl_delta`: settlement/correction changes to realized P/L.
+- `realized_pnl_delta`: final settlement changes to realized P/L.
 
 Entry types are `reserve`, `trade`, `payout`, `resolution_reversal`, `refund`,
-`reserve_release`, and `pnl_adjustment`. A check requires at least one nonzero dimension.
+`reserve_release`, and `pnl_adjustment`; `resolution_reversal` remains a historical enum
+value but new resolutions are immutable. A check requires at least one nonzero dimension.
 
 House read models are derived from LMSR bets, trades, and the ledger:
 
@@ -119,7 +120,8 @@ reported as realized profit.
 
 ## 6. Other audit tables
 
-- `resolution_events`: every original resolution and correction, with actor and outcome.
+- `resolution_events`: the single final resolution, with actor and outcome. The legacy
+  `is_correction` column remains false for new events.
 - `bet_edit_events`: immutable end-time changes.
 - `bet_visibility_overrides`: optional group-member allow-list, protected by composite
   bet/group and group/member foreign keys; public bets cannot receive rows.

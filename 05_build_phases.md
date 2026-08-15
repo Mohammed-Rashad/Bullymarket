@@ -28,7 +28,7 @@ Commit: `phase 2: add persistence auth and groups`
 
 - Add mutually exclusive group/public bet APIs, visibility allow-lists, trade preview,
   atomic purchases, positions, cancellation refunds, audited end-time edits, resolution
-  corrections, refills, and realized-P/L leaderboards.
+  resolution audit events, refills, and realized-P/L leaderboards.
 - Prove group/public leaderboard isolation with integration tests.
 - Prove a removed member sees only markets where they already hold a position until
   those markets settle.
@@ -70,7 +70,7 @@ Commit: `phase 6: add verified LMSR pricing engine`
 - Add reversible ORM/migration changes for LMSR state, positions, immutable trades,
   and the append-only house ledger.
 - Make every new market LMSR, reserve `b * ln(2)`, execute signed trades atomically,
-  pay resolution shares, support corrections/cancellation, and expose market/group/
+  pay resolution shares, support cancellation, and expose market/group/
   global house summaries.
 - Gate: concurrency, migration, resolution-bound, accounting, backend lint, and type
   checks pass.

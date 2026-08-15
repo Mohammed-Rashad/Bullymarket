@@ -1,2 +1,1 @@
-"""Resolution, payout, and correction audit trail."""
-
+"""Immutable resolution, payout, and settlement audit trail."""

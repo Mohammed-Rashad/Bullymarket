@@ -15,7 +15,7 @@ from app.modules.groups.service import require_admin
 from app.modules.house.models import HouseLedgerEntryType
 from app.modules.house.service import add_house_entry
 from app.modules.ledger.models import LedgerEntryType
-from app.modules.ledger.service import add_entry, get_unreversed_payouts
+from app.modules.ledger.service import add_entry
 from app.modules.resolution import repository
 from app.modules.resolution.models import ResolutionEvent
 from app.modules.resolution.schemas import ResolutionResponse
@@ -40,45 +40,23 @@ async def resolve_bet(
             raise DomainError("invalid_market", "Group bet has no group", 500)
         await require_admin(session, bet.group_id, resolver_id)
 
-    outcome = await bets_repository.get_outcome(session, bet.id, outcome_id)
-    if outcome is None:
-        raise DomainError("outcome_not_found", "Outcome does not belong to this bet", 404)
     if bet.status is BetStatus.CANCELLED:
         raise DomainError("bet_cancelled", "A cancelled bet cannot be resolved", 409)
-
-    now = datetime.now(UTC)
-    refresh_time_status(bet, now=now)
-    is_correction = bet.status is BetStatus.RESOLVED
-    if not is_correction and aware(bet.end_time) > now:
-        raise DomainError("bet_still_open", "The bet cannot be resolved before its end time", 409)
-    if is_correction and bet.resolved_outcome_id == outcome_id:
+    if bet.status is BetStatus.RESOLVED:
         raise DomainError(
-            "outcome_unchanged",
-            "Choose a different outcome when correcting a resolution",
+            "bet_already_resolved",
+            "A resolved bet is final and cannot be changed",
             409,
         )
 
-    reversed_payout_total = Decimal(0)
-    if is_correction:
-        for payout in await get_unreversed_payouts(session, bet.id):
-            await add_entry(
-                session,
-                user_id=payout.user_id,
-                amount=-payout.amount,
-                entry_type=LedgerEntryType.RESOLUTION_REVERSAL,
-                bet_id=bet.id,
-                related_ledger_entry_id=payout.id,
-            )
-            reversed_payout_total += payout.amount
+    outcome = await bets_repository.get_outcome(session, bet.id, outcome_id)
+    if outcome is None:
+        raise DomainError("outcome_not_found", "Outcome does not belong to this bet", 404)
 
-    if bet.pricing_method is PricingMethod.LMSR and reversed_payout_total > 0:
-        await add_house_entry(
-            session,
-            bet_id=bet.id,
-            group_id=bet.group_id,
-            entry_type=HouseLedgerEntryType.RESOLUTION_REVERSAL,
-            cash_delta=money(reversed_payout_total),
-        )
+    now = datetime.now(UTC)
+    refresh_time_status(bet, now=now)
+    if aware(bet.end_time) > now:
+        raise DomainError("bet_still_open", "The bet cannot be resolved before its end time", 409)
 
     positions = await list_outcome_positions(
         session,
@@ -110,9 +88,7 @@ async def resolve_bet(
                 500,
             )
         old_profit_loss = bet.house_profit_loss or Decimal(0)
-        bet.house_cash_balance = money(
-            bet.house_cash_balance + reversed_payout_total - total_payout
-        )
+        bet.house_cash_balance = money(bet.house_cash_balance - total_payout)
         bet.house_profit_loss = house_profit_loss
         if total_payout > 0:
             await add_house_entry(
@@ -122,14 +98,13 @@ async def resolve_bet(
                 entry_type=HouseLedgerEntryType.PAYOUT,
                 cash_delta=-money(total_payout),
             )
-        if not is_correction:
-            await add_house_entry(
-                session,
-                bet_id=bet.id,
-                group_id=bet.group_id,
-                entry_type=HouseLedgerEntryType.RESERVE_RELEASE,
-                reserve_delta=-bet.house_reserve,
-            )
+        await add_house_entry(
+            session,
+            bet_id=bet.id,
+            group_id=bet.group_id,
+            entry_type=HouseLedgerEntryType.RESERVE_RELEASE,
+            reserve_delta=-bet.house_reserve,
+        )
         pnl_delta = money(house_profit_loss - old_profit_loss)
         if pnl_delta != 0:
             await add_house_entry(
@@ -151,13 +126,13 @@ async def resolve_bet(
             bet_id=bet.id,
             outcome_id=outcome_id,
             resolved_by=resolver_id,
-            is_correction=is_correction,
+            is_correction=False,
         ),
     )
     await session.flush()
     business_event(
         logger,
-        "bet_resolution_corrected" if is_correction else "bet_resolved",
+        "bet_resolved",
         bet_id=str(bet.id),
         outcome_id=str(outcome_id),
         resolver_id=str(resolver_id),
@@ -170,7 +145,7 @@ async def resolve_bet(
     return ResolutionResponse(
         bet_id=bet.id,
         outcome_id=outcome_id,
-        is_correction=is_correction,
+        is_correction=False,
         affected_users=len(positions),
         total_payout=money(total_payout),
         house_profit_loss=house_profit_loss,

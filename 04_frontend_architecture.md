@@ -67,8 +67,8 @@ which recomputes the quote while holding the market lock.
   show to allowed users), countdown to `end_time`, and — critically — once `status =
   closed`, the resolve UI visible only to the authorized resolver (a group admin for a
   group bet), and once `status = resolved`, the payout breakdown and the
-  `resolution_events` history if any corrections happened (§3.5's audit trail needs to
-  actually be visible somewhere, not just stored).
+  final `resolution_event`. Resolved markets expose no settlement or end-time mutation
+  controls.
 - **Leaderboard page**: toggle between weekly / bi-weekly / monthly / all-time. A group
   view shows realized points won/lost only from resolved bets in that selected group;
   the global/public view shows realized points won/lost only from standalone public

@@ -111,8 +111,8 @@ House accounting is separate from the user ledger and is append-only.
 - Every trade stores its signed `house_cash_flow`, equal to the signed LMSR cost.
 - Every market stores its reserved exposure, running net cash from trades/payouts, and
   final realized house P/L once resolved.
-- `house_ledger_entries` records reserve, trade, payout, payout reversal, refund,
-  reserve release, and realized-P/L adjustment events.
+- `house_ledger_entries` records reserve, trade, payout, refund, reserve release, and
+  realized-P/L adjustment events. Historical reversal types remain readable.
 - Each trade and house event has a per-market monotonic sequence so the complete state
   can be reconstructed even if timestamps tie.
 - A group summary filters by that exact `group_id`. A global house summary includes all
@@ -133,8 +133,8 @@ winner is paid.
   the immutable trade row, and the house ledger.
 - Cancellation returns each user's net LMSR cash paid (buys minus sell proceeds),
   reverses the house cash, and releases reserved exposure.
-- Resolution correction reverses the prior user payouts and matching house payout,
-  pays the corrected side, and records only the change in realized house P/L.
+- Resolution is immutable. After the first successful settlement, every later resolve
+  request is rejected and no payout or house entry changes.
 - Removed group members retain access only to markets where they already have a
   position until those markets settle or are cancelled.
 
@@ -146,7 +146,7 @@ winner is paid.
   average fill price and post-trade prices; no write.
 - `POST /api/v1/markets/{id}/trade` — authenticated atomic buy/sell.
 - `GET /api/v1/markets/{id}/trades` — ordered immutable audit history.
-- `POST /api/v1/bets/{id}/resolve` — authorized settlement/correction.
+- `POST /api/v1/bets/{id}/resolve` — authorized one-time settlement.
 - `GET /api/v1/bets/{id}/house` and `/house-ledger` — market accounting.
 - `GET /api/v1/groups/{id}/house` — exact-group house summary for a group admin.
 - `GET /api/v1/house` — authenticated global house summary.
@@ -165,8 +165,7 @@ current UI temporarily sends positive purchase deltas only.
 6. A sell cannot exceed the user's held shares.
 7. Simultaneous trades have monotonic sequences and no lost `q` update.
 8. User and house cash movements are equal and opposite.
-9. Resolution correction is financially identical to resolving directly to the final
-   outcome.
+9. A second resolution attempt returns a conflict and leaves every balance unchanged.
 10. Group/public leaderboard and house-summary scopes cannot leak into each other.
 
 ## Appendix: future N-outcome LMSR

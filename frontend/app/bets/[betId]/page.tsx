@@ -18,6 +18,11 @@ import {
   useResolutionEvents,
   useResolveBet,
 } from "@/features/bets/hooks";
+import {
+  canCancelBet,
+  canEditEndTime,
+  canResolveBet,
+} from "@/features/bets/permissions";
 import { useGroups } from "@/features/groups/hooks";
 import { TradeTicket } from "@/features/trading/components/trade-ticket";
 import { useMyPositions, useTrades } from "@/features/trading/hooks";
@@ -45,10 +50,9 @@ export default function BetDetailPage() {
     () => groups.data?.find((item) => item.id === bet?.group_id),
     [bet?.group_id, groups.data],
   );
-  const canResolve =
-    bet?.visibility === "public" || group?.role === "admin";
-  const canManage =
-    bet?.created_by === me.data?.id || group?.role === "admin";
+  const canResolve = bet ? canResolveBet(bet, group) : false;
+  const canEdit = bet ? canEditEndTime(bet, me.data?.id, group) : false;
+  const canCancel = bet ? canCancelBet(bet, me.data?.id, group) : false;
 
   if (betQuery.isLoading) return <Loading label="Loading market…" />;
   if (betQuery.error) {
@@ -216,16 +220,12 @@ export default function BetDetailPage() {
               ) : null}
             </Card>
           ) : null}
-          {canResolve && (bet.status === "closed" || bet.status === "resolved") ? (
+          {canResolve ? (
             <Card className="card-pad">
-              <span className="eyebrow">
-                {bet.status === "resolved" ? "Correction" : "Settlement"}
-              </span>
-              <h2>
-                {bet.status === "resolved" ? "Correct outcome" : "Pick the winner"}
-              </h2>
+              <span className="eyebrow">Settlement</span>
+              <h2>Pick the winner</h2>
               <p className="muted">
-                Payouts and any later reversal are recorded in the ledger.
+                Payouts are recorded in the ledger. This decision is final.
               </p>
               <div className="form-stack">
                 {bet.outcomes.map((outcome) => (
@@ -249,47 +249,57 @@ export default function BetDetailPage() {
             </Card>
           ) : null}
 
-          {canManage && bet.status !== "resolved" ? (
+          {canEdit || canCancel ? (
             <Card className="card-pad">
               <span className="eyebrow">Market controls</span>
-              <h2>Edit close time</h2>
-              <form className="form-stack" onSubmit={submitEndTime}>
-                <Input
-                  min={new Date().toISOString().slice(0, 16)}
-                  onChange={(event) => setNewEndTime(event.target.value)}
-                  required
-                  type="datetime-local"
-                  value={newEndTime}
-                />
-                <Button
-                  className="secondary"
-                  disabled={editEndTime.isPending}
-                  type="submit"
-                >
-                  Save new time
-                </Button>
-              </form>
-              <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "22px 0" }} />
-              <Button
-                className="danger"
-                disabled={cancel.isPending}
-                onClick={() =>
-                  cancel.mutate(undefined, {
-                    onSuccess: () =>
-                      router.push(
-                        bet.group_id ? `/groups/${bet.group_id}` : "/public",
-                      ),
-                  })
-                }
-                type="button"
-              >
-                Cancel and refund
-              </Button>
-              {editEndTime.error ? (
-                <ErrorNotice message={errorMessage(editEndTime.error)} />
+              {canEdit ? (
+                <>
+                  <h2>Edit close time</h2>
+                  <form className="form-stack" onSubmit={submitEndTime}>
+                    <Input
+                      min={new Date().toISOString().slice(0, 16)}
+                      onChange={(event) => setNewEndTime(event.target.value)}
+                      required
+                      type="datetime-local"
+                      value={newEndTime}
+                    />
+                    <Button
+                      className="secondary"
+                      disabled={editEndTime.isPending}
+                      type="submit"
+                    >
+                      Save new time
+                    </Button>
+                  </form>
+                  {editEndTime.error ? (
+                    <ErrorNotice message={errorMessage(editEndTime.error)} />
+                  ) : null}
+                </>
               ) : null}
-              {cancel.error ? (
-                <ErrorNotice message={errorMessage(cancel.error)} />
+              {canEdit && canCancel ? (
+                <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "22px 0" }} />
+              ) : null}
+              {canCancel ? (
+                <>
+                  <Button
+                    className="danger"
+                    disabled={cancel.isPending}
+                    onClick={() =>
+                      cancel.mutate(undefined, {
+                        onSuccess: () =>
+                          router.push(
+                            bet.group_id ? `/groups/${bet.group_id}` : "/public",
+                          ),
+                      })
+                    }
+                    type="button"
+                  >
+                    Cancel and refund
+                  </Button>
+                  {cancel.error ? (
+                    <ErrorNotice message={errorMessage(cancel.error)} />
+                  ) : null}
+                </>
               ) : null}
             </Card>
           ) : null}
