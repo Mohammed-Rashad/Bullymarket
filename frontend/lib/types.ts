@@ -4,6 +4,12 @@ export type BetListStatus = Exclude<BetStatus, "cancelled"> | "all";
 export type PricingMethod = "cpmm" | "lmsr";
 export type TradeSide = "yes" | "no";
 export type LeaderboardWindow = "weekly" | "biweekly" | "monthly" | "all_time";
+export type NotificationKind =
+  | "bet_created"
+  | "bet_closed"
+  | "resolution_reminder"
+  | "bet_resolved"
+  | "bet_refunded";
 
 export interface UserProfile {
   id: string;
@@ -70,6 +76,34 @@ export interface PaginatedBets {
   page_size: number;
   total: number;
   total_pages: number;
+}
+
+export interface Notification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  group_id: string | null;
+  bet_id: string | null;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface PaginatedNotifications {
+  items: Notification[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  unread_count: number;
+}
+
+export interface NotificationPreferences {
+  email_enabled: boolean;
+  bet_created_email: boolean;
+  bet_closed_email: boolean;
+  bet_resolved_email: boolean;
+  bet_refunded_email: boolean;
 }
 
 export interface Position {

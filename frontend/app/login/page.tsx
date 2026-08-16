@@ -47,7 +47,10 @@ export default function LoginPage() {
               />
             </div>
             <div className="field">
-              <label htmlFor="password">Password</label>
+              <div className="field-label-row">
+                <label htmlFor="password">Password</label>
+                <Link href="/forgot-password">Forgot password?</Link>
+              </div>
               <Input
                 autoComplete="current-password"
                 id="password"
@@ -73,4 +76,3 @@ export default function LoginPage() {
     </main>
   );
 }
-

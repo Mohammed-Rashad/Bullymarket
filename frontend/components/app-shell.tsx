@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useAuthToken, useLogout, useMe } from "@/features/auth/hooks";
+import { useUnreadNotifications } from "@/features/notifications/hooks";
 import { AUTH_FAILURE_EVENT } from "@/lib/api-client";
 
 const links = [
@@ -22,7 +23,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const token = useAuthToken();
   const logout = useLogout();
   const me = useMe();
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const unread = useUnreadNotifications(Boolean(token));
+  const isAuthPage =
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/forgot-password";
 
   useEffect(() => {
     const handleAuthenticationFailure = () => {
@@ -60,6 +65,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="account-strip">
           {token ? (
             <>
+              <Link
+                aria-label={`${unread.data?.unread_count ?? 0} unread notifications`}
+                className={`notification-link ${
+                  pathname.startsWith("/notifications") ? "active" : ""
+                }`}
+                href="/notifications"
+              >
+                <span aria-hidden="true">●</span>
+                <span>Alerts</span>
+                {unread.data?.unread_count ? (
+                  <strong>{Math.min(unread.data.unread_count, 99)}</strong>
+                ) : null}
+              </Link>
               <span className="balance-pill">
                 <small>Balance</small>
                 <strong>{Number(me.data?.balance ?? 0).toFixed(2)} pts</strong>

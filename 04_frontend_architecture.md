@@ -20,13 +20,14 @@ app/                    # Next.js App Router pages/layouts (routing only)
   leaderboard/
 features/                    # mirrors backend modules
   auth/
-    api.ts          # typed fetch wrappers for auth endpoints
-    hooks.ts          # useLogin, useSignup, useCurrentUser
+    api.ts          # login, signup verification, forgot/reset password wrappers
+    hooks.ts          # auth mutations, token handling, useCurrentUser
     components/
   groups/
   bets/
   trading/          # signed LMSR trade flow, quotes, prices, and audit
   leaderboard/
+  notifications/          # feed, unread polling, read state, email preferences
 components/          # truly generic, cross-feature UI (Button, Card, Modal — no business logic)
 lib/
   api-client.ts          # shared fetch wrapper: base URL, auth header injection, error handling
@@ -84,6 +85,15 @@ which recomputes the quote while holding the market lock.
   or group navigation, and the public-only global leaderboard can appear alongside
   them. Public and group feeds share server-backed status and pagination controls; the
   client never downloads the complete feed to filter it locally.
+- **Authentication**: signup collects account details, then switches to a six-digit
+  code form; no token exists until `/auth/signup/verify` succeeds. Forgot password uses
+  an email request followed by code plus new password. The shared API client handles
+  expired/rejected authentication by clearing cached identity and redirecting to sign
+  in.
+- **Notifications**: the header polls an unread count and links to a paginated feed.
+  Items link to the relevant group bet and may be marked individually or all at once.
+  Email switches are preferences only; in-app group notifications remain enabled.
+  The UI makes clear that public markets do not produce alerts.
 
 ## 4. State management
 

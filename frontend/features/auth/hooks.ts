@@ -39,14 +39,30 @@ export function useLogin() {
 }
 
 export function useSignup() {
+  return useMutation({ mutationFn: authApi.signup });
+}
+
+function useTokenMutation<TInput>(mutationFn: (input: TInput) => Promise<authApi.TokenResponse>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: authApi.signup,
+    mutationFn,
     onSuccess: ({ access_token }) => {
       setToken(access_token);
       void queryClient.invalidateQueries();
     },
   });
+}
+
+export function useVerifySignup() {
+  return useTokenMutation(authApi.verifySignup);
+}
+
+export function useForgotPassword() {
+  return useMutation({ mutationFn: authApi.forgotPassword });
+}
+
+export function useResetPassword() {
+  return useTokenMutation(authApi.resetPassword);
 }
 
 export function useLogout() {
@@ -56,4 +72,3 @@ export function useLogout() {
     queryClient.clear();
   };
 }
-
