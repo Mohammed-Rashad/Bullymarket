@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter
 
-from app.api.dependencies import CurrentUser, SessionDependency
+from app.api.dependencies import CurrentUser, SessionDependency, SettingsDependency
 from app.modules.resolution.schemas import (
     ResolutionEventResponse,
     ResolutionResponse,
@@ -18,6 +18,7 @@ async def resolve_bet_route(
     bet_id: UUID,
     payload: ResolveRequest,
     session: SessionDependency,
+    settings: SettingsDependency,
     current_user: CurrentUser,
 ) -> ResolutionResponse:
     return await resolve_bet(
@@ -25,6 +26,7 @@ async def resolve_bet_route(
         bet_id=bet_id,
         outcome_id=payload.outcome_id,
         resolver_id=current_user.id,
+        settings=settings,
     )
 
 
@@ -45,4 +47,3 @@ async def resolution_events_route(
             user_id=current_user.id,
         )
     ]
-

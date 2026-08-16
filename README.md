@@ -37,13 +37,13 @@ the current frontend intentionally exposes purchases only.
 
 - `backend/` — async FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL, pytest
 - `frontend/` — Next.js App Router, TypeScript, Tailwind CSS, TanStack Query
-- `backend/compose.yaml` — the API, migration, and PostgreSQL stack
+- `backend/compose.yaml` — the API, notification/email worker, migration, and PostgreSQL stack
 - `01_...md` through `06_...md` — product and architecture decisions
 
 ## Run with Docker
 
 The Compose project lives in `backend/` and starts PostgreSQL, applies all pending
-Alembic migrations, then starts the API:
+Alembic migrations, then starts the API and notification/email worker:
 
 ```bash
 cd backend
@@ -108,6 +108,43 @@ Run the scheduled refill as a separate daily cron command:
 cd backend
 ../.venv/bin/python -m app.modules.refill.job
 ```
+
+Run notifications and email delivery as a separate long-running process when not using
+Compose:
+
+```bash
+cd backend
+../.venv/bin/python -m app.modules.notifications.worker
+```
+
+## Email with a Cloudflare domain
+
+Yes—if the domain is onboarded to Cloudflare Email Service **Email Sending**. Email
+Routing/DNS by itself only handles routing records; it does not make this application
+an outbound mail server. In the Cloudflare dashboard:
+
+1. Enable Email Sending for the domain and publish the SPF/DKIM records Cloudflare
+   provides. Add a DMARC policy for the domain as well.
+2. Create a Cloudflare API token with `Email Sending: Edit` permission.
+3. Copy `backend/.env.example` to `backend/.env`, set
+   `BULLYMARKET_SMTP_PASSWORD` to that token, set
+   `BULLYMARKET_EMAIL_FROM_ADDRESS` to an address on the onboarded domain, and set
+   `BULLYMARKET_EMAIL_ENABLED=true`.
+4. Keep the SMTP host `smtp.mx.cloudflare.net`, port `465`, and username `api_token`.
+   The worker uses implicit TLS, which is the mode required by Cloudflare's SMTP
+   endpoint.
+
+Cloudflare references: [SMTP credentials and endpoint](https://developers.cloudflare.com/email-service/api/send-emails/smtp/),
+[SMTP sending example](https://developers.cloudflare.com/email-service/examples/email-sending/smtp/),
+and [email authentication](https://developers.cloudflare.com/email-service/concepts/email-authentication/).
+Do not commit the API token.
+
+Registration is not completed until the backend validates the six-digit email code.
+The code is stored as an HMAC hash in the verification table and is never returned by
+the API. Password reset behaves the same way and deliberately gives the same request
+response for known and unknown addresses. In-app alerts and optional emails cover group
+bet creation, close time, creator resolution reminders, final resolution, and participant
+refunds. **Public bets never create notifications or email messages.**
 
 ### 2. Frontend
 

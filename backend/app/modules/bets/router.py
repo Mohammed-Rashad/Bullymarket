@@ -150,10 +150,12 @@ async def list_edit_events_route(
 async def cancel_bet_route(
     bet_id: UUID,
     session: SessionDependency,
+    settings: SettingsDependency,
     current_user: CurrentUser,
 ) -> CancellationResponse:
     return await cancel_bet(
         session,
         bet_id=bet_id,
         actor_id=current_user.id,
+        settings=settings,
     )

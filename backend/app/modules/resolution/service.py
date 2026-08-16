@@ -5,6 +5,7 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import Settings
 from app.core.exceptions import DomainError
 from app.core.logging import business_event
 from app.core.money import money
@@ -16,6 +17,8 @@ from app.modules.house.models import HouseLedgerEntryType
 from app.modules.house.service import add_house_entry
 from app.modules.ledger.models import LedgerEntryType
 from app.modules.ledger.service import add_entry
+from app.modules.notifications.models import NotificationKind
+from app.modules.notifications.service import notify_group_bet
 from app.modules.resolution import repository
 from app.modules.resolution.models import ResolutionEvent
 from app.modules.resolution.schemas import ResolutionResponse
@@ -31,6 +34,7 @@ async def resolve_bet(
     bet_id: UUID,
     outcome_id: UUID,
     resolver_id: UUID,
+    settings: Settings,
 ) -> ResolutionResponse:
     bet = await bets_repository.get_bet(session, bet_id, lock=True)
     if bet is None:
@@ -128,6 +132,13 @@ async def resolve_bet(
             resolved_by=resolver_id,
             is_correction=False,
         ),
+    )
+    await notify_group_bet(
+        session,
+        bet=bet,
+        kind=NotificationKind.BET_RESOLVED,
+        settings=settings,
+        outcome_label=outcome.label,
     )
     await session.flush()
     business_event(

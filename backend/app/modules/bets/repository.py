@@ -137,6 +137,21 @@ async def list_public_bets(session: AsyncSession) -> list[Bet]:
     )
 
 
+async def list_due_group_bets(session: AsyncSession, now: datetime) -> list[Bet]:
+    return list(
+        await session.scalars(
+            select(Bet)
+            .where(
+                Bet.visibility == BetVisibility.GROUP,
+                Bet.group_id.is_not(None),
+                Bet.status.in_([BetStatus.OPEN, BetStatus.CLOSED]),
+                Bet.end_time <= now,
+            )
+            .with_for_update(skip_locked=True)
+        )
+    )
+
+
 async def get_visibility_user_ids(session: AsyncSession, bet_id: UUID) -> set[UUID]:
     return set(
         await session.scalars(

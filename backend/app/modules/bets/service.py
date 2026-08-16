@@ -36,6 +36,8 @@ from app.modules.house.models import HouseLedgerEntryType
 from app.modules.house.service import add_house_entry
 from app.modules.ledger.models import LedgerEntryType
 from app.modules.ledger.service import add_entry, get_bet_stakes
+from app.modules.notifications.models import NotificationKind
+from app.modules.notifications.service import notify_group_bet
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +166,12 @@ async def create_group_bet(
         group_id=bet.group_id,
         entry_type=HouseLedgerEntryType.RESERVE,
         reserve_delta=reserve,
+    )
+    await notify_group_bet(
+        session,
+        bet=bet,
+        kind=NotificationKind.BET_CREATED,
+        settings=settings,
     )
     return await build_response(session, bet, outcomes)
 
@@ -361,6 +369,7 @@ async def cancel_bet(
     *,
     bet_id: UUID,
     actor_id: UUID,
+    settings: Settings,
 ) -> CancellationResponse:
     bet = await repository.get_bet(session, bet_id, lock=True)
     if bet is None:
@@ -427,6 +436,12 @@ async def cancel_bet(
     cancelled_at = utc_now()
     bet.status = BetStatus.CANCELLED
     bet.cancelled_at = cancelled_at
+    await notify_group_bet(
+        session,
+        bet=bet,
+        kind=NotificationKind.BET_REFUNDED,
+        settings=settings,
+    )
     await session.flush()
     business_event(
         logger,

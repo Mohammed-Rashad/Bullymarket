@@ -41,7 +41,7 @@ module's tables populated just to test leaderboard math.
 ```
 app/
   modules/
-    auth/          # login, signup, JWT issuance/verification
+    auth/          # login, email-verified signup, password reset, JWT issuance
     users/          # user profile, points balance (reads the ledger)
     groups/          # groups, membership, admin roles, invites
     bets/          # bet creation, visibility rules, listing, status transitions
@@ -52,6 +52,7 @@ app/
     ledger/          # the ledger_entries table: append entries, compute balances
     leaderboard/          # read-only aggregation queries over ledger + groups + bets
     refill/          # the scheduled job that adds the periodic points refill
+    notifications/          # in-app events, preferences, email outbox + worker
   core/
     db.py          # async engine/session setup, shared by all modules
     config.py          # env-based settings (pydantic-settings)
@@ -217,11 +218,15 @@ concretely, not just "add print statements."
 - Group and public bet-list operations return the same pagination envelope and accept
   optional status filtering. Group visibility/removal rules are applied before totals
   and page slices, so inaccessible markets never affect a user's pagination metadata.
-- Auth: JWT bearer tokens, standard `python-jose` or FastAPI's own recommended pattern.
-  Keep this simple — no need for OAuth2 social login, refresh token rotation schemes, or
-  anything elaborate for a friends app in v1. Email + password, hashed with `bcrypt` or
-  `argon2`, JWT with a reasonable expiry, refresh by re-login. Document this explicitly
-  as the "simple, not fancy" auth choice so the agent doesn't over-engineer it.
+- Auth: JWT bearer tokens and Argon2 password hashes. Signup first queues a six-digit
+  email code; only backend verification creates the user and issues a JWT. Forgot
+  password uses the same short-lived, attempt-limited challenge design and does not
+  reveal whether an address exists. Codes are never returned to the frontend.
+- Notification APIs expose a paginated in-app feed, unread state, and email preferences.
+  Lifecycle writes and outbox inserts occur in the same database transaction as the
+  group-bet action. The worker closes time-expired group markets, emits idempotent member
+  alerts (with a creator-specific resolution reminder), and delivers queued SMTP mail.
+  Public-bet paths are hard-excluded before recipient lookup or outbox creation.
 
 ## 6. Refill job
 

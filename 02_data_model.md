@@ -19,6 +19,15 @@ balance is derived from `SUM(ledger_entries.amount)`; it is not a mutable user c
 join the current user `display_name` for presentation; names are not duplicated in the
 membership table.
 
+### `verification_challenges`
+
+Short-lived registration and password-reset challenges store a normalized email,
+purpose, HMAC-SHA256 code hash, attempt count, expiry, and consumed timestamp. Pending
+registration name/password-hash data remains backend-only until successful verification;
+the plaintext code is never included in an API response. Reset challenges optionally
+reference the existing user. New requests consume older active challenges, resends are
+rate-limited, and successful challenges cannot be reused.
+
 ## 2. Markets
 
 The existing table is named `bets`; API routes use both “bets” and “markets” according
@@ -128,7 +137,24 @@ reported as realized profit.
 - `bet_visibility_overrides`: optional group-member allow-list, protected by composite
   bet/group and group/member foreign keys; public bets cannot receive rows.
 
-## 7. Migration contract
+## 7. Notifications and email delivery
+
+- `notification_preferences` stores a user's global email switch and per-event choices.
+  In-app notifications remain enabled.
+- `notifications` stores an append-only user event with read time and optional group/bet
+  links. Unique `(user_id, kind, bet_id)` makes lifecycle emission idempotent.
+- `email_outbox` stores durable email work, delivery attempts, retry availability, and
+  sent/failed state. The worker sends through implicit-TLS SMTP and retries transient
+  errors without holding up API requests.
+
+Notification selection starts from active group membership and applies restricted-bet
+visibility. Bet creators receive a resolution reminder when their market closes; other
+visible group members receive a closed notice. Refund events tell every visible group
+member that the market was cancelled and all stakes were returned. A hard service-layer
+scope guard returns immediately for every public bet, so public markets create neither
+notification rows nor email outbox rows.
+
+## 8. Migration contract
 
 Alembic revision `0002`:
 
@@ -141,3 +167,7 @@ Alembic revision `0002`:
 No historical market is converted or repriced. New creation code explicitly writes
 `pricing_method = 'lmsr'`, initializes `q_yes = q_no = 0`, and appends the reserve event
 within the same transaction.
+
+Alembic revision `0003` adds verification challenges, notification preferences,
+notifications, and the durable email outbox with reversible indexes, constraints, enum
+types, and foreign keys.

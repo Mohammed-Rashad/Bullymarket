@@ -36,6 +36,10 @@ def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
         "bet_edit_events",
         "trades",
         "house_ledger_entries",
+        "verification_challenges",
+        "notification_preferences",
+        "notifications",
+        "email_outbox",
     } <= tables
     command.check(config)
 

@@ -39,6 +39,19 @@ services:
       BULLYMARKET_REFILL_AMOUNT: ${BULLYMARKET_REFILL_AMOUNT:-500}
       BULLYMARKET_REFILL_INTERVAL_DAYS: ${BULLYMARKET_REFILL_INTERVAL_DAYS:-7}
       BULLYMARKET_CORS_ORIGINS: '${BULLYMARKET_CORS_ORIGINS:-["http://localhost:3000"]}'
+      BULLYMARKET_FRONTEND_URL: ${BULLYMARKET_FRONTEND_URL:-http://localhost:3000}
+      BULLYMARKET_VERIFICATION_CODE_MINUTES: ${BULLYMARKET_VERIFICATION_CODE_MINUTES:-10}
+      BULLYMARKET_VERIFICATION_MAX_ATTEMPTS: ${BULLYMARKET_VERIFICATION_MAX_ATTEMPTS:-5}
+      BULLYMARKET_VERIFICATION_RESEND_SECONDS: ${BULLYMARKET_VERIFICATION_RESEND_SECONDS:-60}
+      BULLYMARKET_EMAIL_ENABLED: ${BULLYMARKET_EMAIL_ENABLED:-false}
+      BULLYMARKET_SMTP_HOST: ${BULLYMARKET_SMTP_HOST:-smtp.mx.cloudflare.net}
+      BULLYMARKET_SMTP_PORT: ${BULLYMARKET_SMTP_PORT:-465}
+      BULLYMARKET_SMTP_USERNAME: ${BULLYMARKET_SMTP_USERNAME:-api_token}
+      BULLYMARKET_SMTP_PASSWORD: ${BULLYMARKET_SMTP_PASSWORD:-}
+      BULLYMARKET_EMAIL_FROM_ADDRESS: ${BULLYMARKET_EMAIL_FROM_ADDRESS:-no-reply@example.com}
+      BULLYMARKET_EMAIL_FROM_NAME: ${BULLYMARKET_EMAIL_FROM_NAME:-BullyMarket}
+      BULLYMARKET_NOTIFICATION_WORKER_INTERVAL_SECONDS: ${BULLYMARKET_NOTIFICATION_WORKER_INTERVAL_SECONDS:-30}
+      BULLYMARKET_EMAIL_DELIVERY_BATCH_SIZE: ${BULLYMARKET_EMAIL_DELIVERY_BATCH_SIZE:-20}
     depends_on:
       postgres:
         condition: service_healthy
@@ -66,6 +79,18 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    init: true
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.modules.notifications.worker"]
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     init: true
     restart: unless-stopped
 

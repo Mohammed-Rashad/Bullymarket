@@ -18,6 +18,11 @@ but should be environment/config-driven, not literals buried in code:
   is actually being used and it's clear whether weekly or monthly refills feel better
   for keeping the game interesting without letting balances snowball too fast or too
   slow).
+- Verification expiry, maximum attempts, and resend cooldown are environment settings.
+- Email delivery is disabled by default and uses configurable SMTP host/port/username,
+  secret password, from identity, delivery batch size, and worker interval. Cloudflare
+  Email Sending uses implicit TLS on port 465, literal username `api_token`, and an API
+  token with Email Sending permission as the password.
 
 ## Explicit v1/v2 boundary (collected from decisions made throughout this plan)
 
@@ -34,6 +39,9 @@ but should be environment/config-driven, not literals buried in code:
 - Weekly/bi-weekly/monthly/all-time realized-profit/loss leaderboards: each group uses
   only that group's resolved bets, while global uses only standalone public bets.
 - Polling-based odds updates (not real-time push).
+- Backend-verified registration email OTP and forgot-password reset flow.
+- Persistent in-app group notifications plus configurable Cloudflare SMTP email for
+  created, closed/reminder, resolved, and refunded events. Public bets are excluded.
 
 **Deferred to v2 (schema left not-actively-hostile to these, per notes throughout, but
 not built now):**

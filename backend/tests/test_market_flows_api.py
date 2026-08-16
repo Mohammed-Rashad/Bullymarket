@@ -1,4 +1,5 @@
 import asyncio
+import re
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -6,11 +7,13 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core import db
 from app.core.config import get_settings
 from app.modules.bets.models import Bet
+from app.modules.notifications.models import EmailOutbox, Notification, NotificationKind
+from app.modules.notifications.worker import run_notification_cycle
 from app.modules.refill.service import run_refills
 from app.modules.users.models import User
 
@@ -28,8 +31,25 @@ async def signup(client: AsyncClient, email: str, display_name: str) -> str:
             "password": "correct horse battery staple",
         },
     )
-    assert response.status_code == 201, response.text
-    return str(response.json()["access_token"])
+    assert response.status_code == 202, response.text
+    async with db.SessionFactory() as session:
+        message = await session.scalar(
+            select(EmailOutbox)
+            .where(
+                EmailOutbox.recipient_email == email.lower(),
+                EmailOutbox.category == "registration_otp",
+            )
+            .order_by(EmailOutbox.created_at.desc())
+        )
+    assert message is not None
+    match = re.search(r"\b\d{6}\b", message.text_body)
+    assert match is not None
+    verification = await client.post(
+        "/api/v1/auth/signup/verify",
+        json={"email": email, "code": match.group()},
+    )
+    assert verification.status_code == 201, verification.text
+    return str(verification.json()["access_token"])
 
 
 async def create_group(client: AsyncClient, token: str, name: str = "Friends") -> dict[str, Any]:
@@ -648,3 +668,94 @@ async def test_concurrent_lmsr_trades_have_no_lost_update(
         Decimal(5),
         Decimal(10),
     ]
+
+
+@pytest.mark.asyncio
+async def test_group_lifecycle_notifications_never_include_public_bets(
+    client: AsyncClient,
+) -> None:
+    admin_token = await signup(client, "notify-admin@test.com", "Notify Admin")
+    member_token = await signup(client, "notify-member@test.com", "Notify Member")
+    group = await create_group(client, admin_token, "Notification Group")
+    await join_group(client, member_token, group["invite_code"])
+
+    group_bet = await create_group_bet(
+        client,
+        admin_token,
+        group["id"],
+        question="Notify the group?",
+    )
+    public_bet = await create_public_bet(
+        client,
+        admin_token,
+        question="Never notify for this public bet?",
+    )
+
+    member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
+    assert member_feed.status_code == 200
+    assert [item["kind"] for item in member_feed.json()["items"]] == [
+        NotificationKind.BET_CREATED.value
+    ]
+    assert member_feed.json()["items"][0]["bet_id"] == group_bet["id"]
+
+    async with db.SessionFactory() as session:
+        public_email_count = await session.scalar(
+            select(func.count(EmailOutbox.id))
+            .join(Notification, EmailOutbox.notification_id == Notification.id)
+            .where(Notification.bet_id == UUID(public_bet["id"]))
+        )
+    assert public_email_count == 0
+
+    await expire_bet(group_bet["id"])
+    created, delivered = await run_notification_cycle(get_settings())
+    assert created == 2
+    assert delivered == 0
+
+    member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
+    assert {item["kind"] for item in member_feed.json()["items"]} == {
+        NotificationKind.BET_CLOSED.value,
+        NotificationKind.BET_CREATED.value,
+    }
+    admin_feed = await client.get("/api/v1/notifications", headers=auth(admin_token))
+    assert NotificationKind.RESOLUTION_REMINDER.value in {
+        item["kind"] for item in admin_feed.json()["items"]
+    }
+
+    resolved = await client.post(
+        f"/api/v1/bets/{group_bet['id']}/resolve",
+        json={"outcome_id": group_bet["outcomes"][0]["id"]},
+        headers=auth(admin_token),
+    )
+    assert resolved.status_code == 200, resolved.text
+    member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
+    assert NotificationKind.BET_RESOLVED.value in {
+        item["kind"] for item in member_feed.json()["items"]
+    }
+
+    refund_bet = await create_group_bet(
+        client,
+        admin_token,
+        group["id"],
+        question="Refund notification?",
+    )
+    await trade(client, member_token, refund_bet["id"], side="yes", shares="5")
+    cancelled = await client.delete(
+        f"/api/v1/bets/{refund_bet['id']}", headers=auth(admin_token)
+    )
+    assert cancelled.status_code == 200, cancelled.text
+    member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
+    assert NotificationKind.BET_REFUNDED.value in {
+        item["kind"] for item in member_feed.json()["items"]
+    }
+
+    first_id = member_feed.json()["items"][0]["id"]
+    marked = await client.patch(
+        f"/api/v1/notifications/{first_id}/read", headers=auth(member_token)
+    )
+    assert marked.status_code == 200
+    read_all = await client.post(
+        "/api/v1/notifications/read-all", headers=auth(member_token)
+    )
+    assert read_all.status_code == 200
+    member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
+    assert member_feed.json()["unread_count"] == 0

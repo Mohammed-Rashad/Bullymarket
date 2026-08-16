@@ -97,3 +97,20 @@ Commit: `phase 8: ship LMSR trading UI and documentation`
 - Gate: full backend/frontend tests, lint, types, and production build.
 
 Commit: `phase 15: paginate and filter market feeds`
+
+## Phase 18 — verified email auth and group notifications
+
+- Add short-lived, HMAC-hashed registration and password-reset challenges; issue auth
+  tokens only after backend verification and keep OTPs out of every API response.
+- Add in-app notification persistence, read state, email preferences, a durable SMTP
+  outbox, and a retrying background worker.
+- Emit group bet created/closed/resolution-reminder/resolved/refunded events while hard
+  excluding public bets from both in-app and email delivery.
+- Add signup verification, forgot-password, alerts, unread badge, preferences, Compose
+  worker, and Cloudflare Email Sending setup documentation.
+- Gate: migration upgrade/downgrade and offline DDL, auth abuse cases, lifecycle/public
+  exclusion integration tests, backend lint/types/tests, frontend lint/types/tests/build,
+  and Compose validation.
+
+Commits: `phase 18: add secure email auth and notifications` and
+`phase 18: add notification and recovery UI`

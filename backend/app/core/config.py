@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +27,19 @@ class Settings(BaseSettings):
     refill_amount: int = 500
     refill_interval_days: int = 7
     cors_origins: list[str] = ["http://localhost:3000"]
+    frontend_url: str = "http://localhost:3000"
+    verification_code_minutes: int = 10
+    verification_max_attempts: int = 5
+    verification_resend_seconds: int = 60
+    email_enabled: bool = False
+    smtp_host: str = "smtp.mx.cloudflare.net"
+    smtp_port: int = 465
+    smtp_username: str = "api_token"
+    smtp_password: SecretStr | None = None
+    email_from_address: str = "no-reply@example.com"
+    email_from_name: str = "BullyMarket"
+    notification_worker_interval_seconds: int = 30
+    email_delivery_batch_size: int = 20
 
 
 @lru_cache
