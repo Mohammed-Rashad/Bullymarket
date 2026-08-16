@@ -2,7 +2,7 @@ import { Button } from "@/components/ui";
 import type { BetListStatus, PaginatedBets } from "@/lib/types";
 
 const statuses: Array<{ label: string; value: BetListStatus }> = [
-  { label: "All statuses", value: "all" },
+  { label: "All", value: "all" },
   { label: "Open", value: "open" },
   { label: "Closed", value: "closed" },
   { label: "Resolved", value: "resolved" },
@@ -26,22 +26,23 @@ export function BetListControls({
 
   return (
     <div className="bet-list-controls">
-      <label>
+      <div className="status-filter-group">
         <span>Filter by status</span>
-        <select
-          className="select"
-          onChange={(event) =>
-            onStatusChange(event.target.value as BetListStatus)
-          }
-          value={status}
-        >
+        <div aria-label="Filter bets by status" className="tabs" role="group">
           {statuses.map((option) => (
-            <option key={option.value} value={option.value}>
+            <button
+              aria-pressed={status === option.value}
+              className={status === option.value ? "active" : ""}
+              disabled={disabled}
+              key={option.value}
+              onClick={() => onStatusChange(option.value)}
+              type="button"
+            >
               {option.label}
-            </option>
+            </button>
           ))}
-        </select>
-      </label>
+        </div>
+      </div>
       <div className="pagination-controls">
         <span className="muted">
           {data?.total ?? 0} {(data?.total ?? 0) === 1 ? "market" : "markets"} · Page {page}

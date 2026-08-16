@@ -20,9 +20,11 @@ describe("BetListControls", () => {
     );
 
     expect(screen.getByText("13 markets · Page 2 of 3")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Filter by status"), {
-      target: { value: "resolved" },
-    });
+    expect(screen.getByRole("button", { name: "All" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Resolved" }));
     fireEvent.click(screen.getByRole("button", { name: "Previous" }));
     fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
