@@ -65,13 +65,13 @@ export default function PublicMarketsPage() {
           />
           {bets.isLoading ? <Loading /> : null}
           {bets.error ? <ErrorNotice message={errorMessage(bets.error)} /> : null}
-          {!bets.isLoading && !bets.data?.items.length ? (
+          {!bets.isLoading && !bets.data?.items?.length ? (
             <EmptyState
               body="Create the first standalone market for signed-in players."
               title="No public calls yet"
             />
           ) : null}
-          {bets.data?.items.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
+          {bets.data?.items?.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
         </section>
         <aside className="stack">
           <Card className="card-pad">

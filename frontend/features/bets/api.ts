@@ -23,14 +23,37 @@ function listQuery({ page, pageSize = 6, status }: BetListParams) {
   return query.toString();
 }
 
-export function listGroupBets(groupId: string, params: BetListParams) {
-  return apiFetch<PaginatedBets>(
-    `/groups/${groupId}/bets?${listQuery(params)}`,
-  );
+export function normalizeBetPage(
+  response: PaginatedBets | Bet[],
+  { page, pageSize = 6, status }: BetListParams,
+): PaginatedBets {
+  if (!Array.isArray(response)) return response;
+  const filtered =
+    status === "all"
+      ? response
+      : response.filter((bet) => bet.status === status);
+  const start = (page - 1) * pageSize;
+  return {
+    items: filtered.slice(start, start + pageSize),
+    page,
+    page_size: pageSize,
+    total: filtered.length,
+    total_pages: Math.ceil(filtered.length / pageSize),
+  };
 }
 
-export function listPublicBets(params: BetListParams) {
-  return apiFetch<PaginatedBets>(`/public-bets?${listQuery(params)}`);
+export async function listGroupBets(groupId: string, params: BetListParams) {
+  const response = await apiFetch<PaginatedBets | Bet[]>(
+    `/groups/${groupId}/bets?${listQuery(params)}`,
+  );
+  return normalizeBetPage(response, params);
+}
+
+export async function listPublicBets(params: BetListParams) {
+  const response = await apiFetch<PaginatedBets | Bet[]>(
+    `/public-bets?${listQuery(params)}`,
+  );
+  return normalizeBetPage(response, params);
 }
 
 export function getBet(betId: string) {

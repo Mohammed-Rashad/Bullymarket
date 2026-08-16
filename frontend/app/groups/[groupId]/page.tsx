@@ -127,7 +127,7 @@ export default function GroupDetailPage() {
           {bets.error ? (
             <ErrorNotice message={errorMessage(bets.error)} />
           ) : null}
-          {!bets.isLoading && !bets.data?.items.length ? (
+          {!bets.isLoading && !bets.data?.items?.length ? (
             <EmptyState
               body={
                 isActive
@@ -137,7 +137,7 @@ export default function GroupDetailPage() {
               title="Nothing open here"
             />
           ) : null}
-          {bets.data?.items.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
+          {bets.data?.items?.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
         </section>
 
         <aside className="stack">
