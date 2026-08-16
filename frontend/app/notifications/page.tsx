@@ -87,7 +87,15 @@ export default function NotificationsPage() {
               </div>
               <div className="notification-actions">
                 {notification.bet_id ? (
-                  <Link className="button compact secondary" href={`/bets/${notification.bet_id}`}>
+                  <Link
+                    className="button compact secondary"
+                    href={`/bets/${notification.bet_id}`}
+                    onClick={() => {
+                      if (!notification.read_at) {
+                        markRead.mutate(notification.id);
+                      }
+                    }}
+                  >
                     Open bet
                   </Link>
                 ) : null}
