@@ -2,6 +2,7 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 export const TOKEN_KEY = "bullymarket_access_token";
+export const AUTH_FAILURE_EVENT = "bullymarket-auth-failed";
 
 export class ApiError extends Error {
   constructor(
@@ -46,6 +47,10 @@ export async function apiFetch<T>(
     headers,
   });
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== "undefined") {
+      clearToken();
+      window.dispatchEvent(new Event(AUTH_FAILURE_EVENT));
+    }
     const payload = (await response.json().catch(() => null)) as
       | {
           error?: { code?: string; message?: string };
@@ -72,4 +77,3 @@ export function errorMessage(error: unknown): string {
   }
   return error instanceof Error ? error.message : "Something went wrong";
 }
-

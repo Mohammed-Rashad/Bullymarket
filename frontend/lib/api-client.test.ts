@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  AUTH_FAILURE_EVENT,
   ApiError,
   TOKEN_KEY,
   apiFetch,
@@ -49,5 +50,25 @@ describe("apiFetch", () => {
       status: 409,
     });
   });
-});
 
+  it("clears rejected authentication and requests a sign-in redirect", async () => {
+    window.localStorage.setItem(TOKEN_KEY, "expired-token");
+    const authenticationFailed = vi.fn();
+    window.addEventListener(AUTH_FAILURE_EVENT, authenticationFailed);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: { code: "invalid_token", message: "Authentication failed" },
+        }),
+        { status: 401 },
+      ),
+    );
+
+    const error = await apiFetch("/users/me").catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ status: 401 });
+    expect(window.localStorage.getItem(TOKEN_KEY)).toBeNull();
+    expect(authenticationFailed).toHaveBeenCalledOnce();
+    window.removeEventListener(AUTH_FAILURE_EVENT, authenticationFailed);
+  });
+});

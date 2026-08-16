@@ -112,3 +112,7 @@ the ability to correlate a user's bug report ("my bet didn't go through") with a
 `request_id` — so failed-request toasts/errors in the UI should be paired with enough
 detail that a user could screenshot it and a developer could grep the logs for what
 happened.
+
+Authentication failures are handled centrally. Any API `401` clears the rejected token
+and cached server data, then redirects to `/login`; login-page failures remain on that
+page so the backend error can be shown without a redirect loop.

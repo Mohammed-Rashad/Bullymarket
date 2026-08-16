@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 
 import { useAuthToken, useLogout, useMe } from "@/features/auth/hooks";
+import { AUTH_FAILURE_EVENT } from "@/lib/api-client";
 
 const links = [
   { href: "/groups", label: "My groups" },
@@ -15,10 +18,21 @@ const links = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const token = useAuthToken();
   const logout = useLogout();
   const me = useMe();
   const isAuthPage = pathname === "/login" || pathname === "/signup";
+
+  useEffect(() => {
+    const handleAuthenticationFailure = () => {
+      queryClient.clear();
+      if (!isAuthPage) router.replace("/login");
+    };
+    window.addEventListener(AUTH_FAILURE_EVENT, handleAuthenticationFailure);
+    return () =>
+      window.removeEventListener(AUTH_FAILURE_EVENT, handleAuthenticationFailure);
+  }, [isAuthPage, queryClient, router]);
 
   if (isAuthPage) return <>{children}</>;
 
