@@ -86,3 +86,14 @@ Commit: `phase 7: persist LMSR trades and house accounting`
 - Gate: full backend and frontend suites, migration checks, production build, and audit.
 
 Commit: `phase 8: ship LMSR trading UI and documentation`
+
+## Phase 15 — paginated, filterable market feeds
+
+- Add a shared paginated response contract to group and public bet APIs with optional
+  `open`, `closed`, and `resolved` filtering.
+- Apply group visibility before totals/page slicing and refresh time-closed status before
+  filtering.
+- Add shared frontend status and Previous/Next controls to both feeds.
+- Gate: full backend/frontend tests, lint, types, and production build.
+
+Commit: `phase 15: paginate and filter market feeds`

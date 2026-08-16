@@ -1,17 +1,36 @@
 import { apiFetch } from "@/lib/api-client";
 import type {
   Bet,
+  BetListStatus,
   BetEditEvent,
   CreateBetInput,
+  PaginatedBets,
   ResolutionEvent,
 } from "@/lib/types";
 
-export function listGroupBets(groupId: string) {
-  return apiFetch<Bet[]>(`/groups/${groupId}/bets`);
+export interface BetListParams {
+  page: number;
+  pageSize?: number;
+  status: BetListStatus;
 }
 
-export function listPublicBets() {
-  return apiFetch<Bet[]>("/public-bets");
+function listQuery({ page, pageSize = 6, status }: BetListParams) {
+  const query = new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+  });
+  if (status !== "all") query.set("status", status);
+  return query.toString();
+}
+
+export function listGroupBets(groupId: string, params: BetListParams) {
+  return apiFetch<PaginatedBets>(
+    `/groups/${groupId}/bets?${listQuery(params)}`,
+  );
+}
+
+export function listPublicBets(params: BetListParams) {
+  return apiFetch<PaginatedBets>(`/public-bets?${listQuery(params)}`);
 }
 
 export function getBet(betId: string) {
@@ -64,4 +83,3 @@ export function listResolutionEvents(betId: string) {
 export function listEditEvents(betId: string) {
   return apiFetch<BetEditEvent[]>(`/bets/${betId}/edit-events`);
 }
-

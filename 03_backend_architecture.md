@@ -214,6 +214,9 @@ concretely, not just "add print statements."
   request body must not accept `group_id`, and a group bet must not accept
   `visibility='public'`. This makes accidental cross-scope queries difficult before the
   database constraint is even reached.
+- Group and public bet-list operations return the same pagination envelope and accept
+  optional status filtering. Group visibility/removal rules are applied before totals
+  and page slices, so inaccessible markets never affect a user's pagination metadata.
 - Auth: JWT bearer tokens, standard `python-jose` or FastAPI's own recommended pattern.
   Keep this simple — no need for OAuth2 social login, refresh token rotation schemes, or
   anything elaborate for a friends app in v1. Email + password, hashed with `bcrypt` or

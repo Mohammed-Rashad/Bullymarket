@@ -82,7 +82,8 @@ which recomputes the quote while holding the market lock.
 - **Public bets feed**: a separate page (matches the user's spec: "a page to show them")
   listing standalone `visibility='public'` bets. These bets have no group attribution
   or group navigation, and the public-only global leaderboard can appear alongside
-  them.
+  them. Public and group feeds share server-backed status and pagination controls; the
+  client never downloads the complete feed to filter it locally.
 
 ## 4. State management
 

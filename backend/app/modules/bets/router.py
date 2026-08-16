@@ -1,15 +1,18 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Query, status
 
 from app.api.dependencies import CurrentUser, SessionDependency, SettingsDependency
 from app.modules.bets import repository
+from app.modules.bets.models import BetStatus
 from app.modules.bets.schemas import (
     BetEditEventResponse,
     BetResponse,
     CancellationResponse,
     CreateBetRequest,
     EditEndTimeRequest,
+    PaginatedBetsResponse,
 )
 from app.modules.bets.service import (
     cancel_bet,
@@ -22,6 +25,10 @@ from app.modules.bets.service import (
 )
 
 router = APIRouter(tags=["bets"])
+
+StatusFilter = Annotated[BetStatus | None, Query(alias="status")]
+PageNumber = Annotated[int, Query(ge=1)]
+PageSize = Annotated[int, Query(ge=1, le=100)]
 
 
 @router.post(
@@ -45,16 +52,22 @@ async def create_group_bet_route(
     )
 
 
-@router.get("/groups/{group_id}/bets", response_model=list[BetResponse])
+@router.get("/groups/{group_id}/bets", response_model=PaginatedBetsResponse)
 async def list_group_bets_route(
     group_id: UUID,
     session: SessionDependency,
     current_user: CurrentUser,
-) -> list[BetResponse]:
+    status_filter: StatusFilter = None,
+    page: PageNumber = 1,
+    page_size: PageSize = 12,
+) -> PaginatedBetsResponse:
     return await list_visible_group_bets(
         session,
         group_id=group_id,
         user_id=current_user.id,
+        status=status_filter,
+        page=page,
+        page_size=page_size,
     )
 
 
@@ -77,12 +90,20 @@ async def create_public_bet_route(
     )
 
 
-@router.get("/public-bets", response_model=list[BetResponse])
+@router.get("/public-bets", response_model=PaginatedBetsResponse)
 async def list_public_bets_route(
     _current_user: CurrentUser,
     session: SessionDependency,
-) -> list[BetResponse]:
-    return await list_public_bets(session)
+    status_filter: StatusFilter = None,
+    page: PageNumber = 1,
+    page_size: PageSize = 12,
+) -> PaginatedBetsResponse:
+    return await list_public_bets(
+        session,
+        status=status_filter,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/bets/{bet_id}", response_model=BetResponse)

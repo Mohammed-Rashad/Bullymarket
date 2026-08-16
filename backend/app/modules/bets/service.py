@@ -24,6 +24,7 @@ from app.modules.bets.schemas import (
     CancellationResponse,
     CreateBetRequest,
     OutcomeResponse,
+    PaginatedBetsResponse,
 )
 from app.modules.groups.models import MemberRole, MembershipStatus
 from app.modules.groups.service import (
@@ -211,18 +212,27 @@ async def create_public_bet(
 
 
 async def list_visible_group_bets(
-    session: AsyncSession, *, group_id: UUID, user_id: UUID
-) -> list[BetResponse]:
+    session: AsyncSession,
+    *,
+    group_id: UUID,
+    user_id: UUID,
+    status: BetStatus | None,
+    page: int,
+    page_size: int,
+) -> PaginatedBetsResponse:
     membership = await get_membership_state(session, group_id, user_id)
     if membership is None:
         raise DomainError("not_group_member", "You are not a member of this group", 403)
-    results: list[BetResponse] = []
+    visible_bets: list[Bet] = []
     for bet in await repository.list_group_bets(session, group_id):
+        refresh_time_status(bet)
+        if status is not None and bet.status is not status:
+            continue
         if membership.status is MembershipStatus.REMOVED:
             from app.modules.trading.service import has_position
 
             if await has_position(session, bet_id=bet.id, user_id=user_id):
-                results.append(await build_response(session, bet))
+                visible_bets.append(bet)
             continue
         if await _visibility_allows(
             session,
@@ -230,15 +240,53 @@ async def list_visible_group_bets(
             user_id=user_id,
             member_role=membership.role,
         ):
-            results.append(await build_response(session, bet))
-    return results
+            visible_bets.append(bet)
+    return await _paginate_bets(
+        session,
+        bets=visible_bets,
+        page=page,
+        page_size=page_size,
+    )
 
 
-async def list_public_bets(session: AsyncSession) -> list[BetResponse]:
-    return [
-        await build_response(session, bet)
-        for bet in await repository.list_public_bets(session)
-    ]
+async def list_public_bets(
+    session: AsyncSession,
+    *,
+    status: BetStatus | None,
+    page: int,
+    page_size: int,
+) -> PaginatedBetsResponse:
+    bets = await repository.list_public_bets(session)
+    for bet in bets:
+        refresh_time_status(bet)
+    filtered = [bet for bet in bets if status is None or bet.status is status]
+    return await _paginate_bets(
+        session,
+        bets=filtered,
+        page=page,
+        page_size=page_size,
+    )
+
+
+async def _paginate_bets(
+    session: AsyncSession,
+    *,
+    bets: list[Bet],
+    page: int,
+    page_size: int,
+) -> PaginatedBetsResponse:
+    total = len(bets)
+    start = (page - 1) * page_size
+    return PaginatedBetsResponse(
+        items=[
+            await build_response(session, bet)
+            for bet in bets[start : start + page_size]
+        ],
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=(total + page_size - 1) // page_size,
+    )
 
 
 async def get_visible_bet(

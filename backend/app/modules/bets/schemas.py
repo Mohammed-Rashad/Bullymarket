@@ -71,6 +71,14 @@ class BetResponse(BaseModel):
     outcomes: list[OutcomeResponse]
 
 
+class PaginatedBetsResponse(BaseModel):
+    items: list[BetResponse]
+    page: int
+    page_size: int
+    total: int
+    total_pages: int
+
+
 class BetEditEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

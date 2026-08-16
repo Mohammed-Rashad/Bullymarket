@@ -1,5 +1,6 @@
 export type BetVisibility = "group" | "public";
 export type BetStatus = "open" | "closed" | "resolved" | "cancelled";
+export type BetListStatus = Exclude<BetStatus, "cancelled"> | "all";
 export type PricingMethod = "cpmm" | "lmsr";
 export type TradeSide = "yes" | "no";
 export type LeaderboardWindow = "weekly" | "biweekly" | "monthly" | "all_time";
@@ -61,6 +62,14 @@ export interface Bet {
   house_cash_balance: string;
   house_profit_loss: string | null;
   outcomes: Outcome[];
+}
+
+export interface PaginatedBets {
+  items: Bet[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
 }
 
 export interface Position {

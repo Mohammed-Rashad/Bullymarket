@@ -2,22 +2,31 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { CreateBetInput } from "@/lib/types";
+import type { BetListStatus, CreateBetInput } from "@/lib/types";
 import * as betsApi from "./api";
 
-export function useGroupBets(groupId: string, enabled = true) {
+export interface BetListOptions {
+  page: number;
+  status: BetListStatus;
+}
+
+export function useGroupBets(
+  groupId: string,
+  options: BetListOptions,
+  enabled = true,
+) {
   return useQuery({
-    queryKey: ["group-bets", groupId],
-    queryFn: () => betsApi.listGroupBets(groupId),
+    queryKey: ["group-bets", groupId, options],
+    queryFn: () => betsApi.listGroupBets(groupId, options),
     enabled: Boolean(groupId) && enabled,
     refetchInterval: 8_000,
   });
 }
 
-export function usePublicBets() {
+export function usePublicBets(options: BetListOptions) {
   return useQuery({
-    queryKey: ["public-bets"],
-    queryFn: betsApi.listPublicBets,
+    queryKey: ["public-bets", options],
+    queryFn: () => betsApi.listPublicBets(options),
     refetchInterval: 8_000,
   });
 }

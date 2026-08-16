@@ -11,6 +11,7 @@ import {
   Loading,
 } from "@/components/ui";
 import { CreateBetForm } from "@/features/bets/components/create-bet-form";
+import { BetListControls } from "@/features/bets/components/bet-list-controls";
 import { MarketCard } from "@/features/bets/components/market-card";
 import { useGroupBets } from "@/features/bets/hooks";
 import {
@@ -24,7 +25,7 @@ import {
 } from "@/features/leaderboard/components/leaderboard-panel";
 import { useGroupLeaderboard } from "@/features/leaderboard/hooks";
 import { errorMessage } from "@/lib/api-client";
-import type { LeaderboardWindow } from "@/lib/types";
+import type { BetListStatus, LeaderboardWindow } from "@/lib/types";
 
 export default function GroupDetailPage() {
   const params = useParams<{ groupId: string }>();
@@ -33,7 +34,13 @@ export default function GroupDetailPage() {
   const groups = useGroups();
   const group = groups.data?.find((item) => item.id === groupId);
   const isActive = group?.membership_status === "active";
-  const bets = useGroupBets(groupId, Boolean(group));
+  const [betPage, setBetPage] = useState(1);
+  const [betStatus, setBetStatus] = useState<BetListStatus>("all");
+  const bets = useGroupBets(
+    groupId,
+    { page: betPage, status: betStatus },
+    Boolean(group),
+  );
   const members = useGroupMembers(groupId, Boolean(group && isActive));
   const removeMember = useRemoveMember(groupId);
   const [window, setWindow] = useState<LeaderboardWindow>("weekly");
@@ -106,11 +113,21 @@ export default function GroupDetailPage() {
               <h2>{isActive ? "Group calls" : "Your unsettled positions"}</h2>
             </div>
           </div>
+          <BetListControls
+            data={bets.data}
+            disabled={bets.isFetching}
+            onPageChange={setBetPage}
+            onStatusChange={(status) => {
+              setBetStatus(status);
+              setBetPage(1);
+            }}
+            status={betStatus}
+          />
           {bets.isLoading ? <Loading /> : null}
           {bets.error ? (
             <ErrorNotice message={errorMessage(bets.error)} />
           ) : null}
-          {!bets.isLoading && !bets.data?.length ? (
+          {!bets.isLoading && !bets.data?.items.length ? (
             <EmptyState
               body={
                 isActive
@@ -120,7 +137,7 @@ export default function GroupDetailPage() {
               title="Nothing open here"
             />
           ) : null}
-          {bets.data?.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
+          {bets.data?.items.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
         </section>
 
         <aside className="stack">

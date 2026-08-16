@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { Button, Card, EmptyState, ErrorNotice, Loading } from "@/components/ui";
 import { CreateBetForm } from "@/features/bets/components/create-bet-form";
+import { BetListControls } from "@/features/bets/components/bet-list-controls";
 import { MarketCard } from "@/features/bets/components/market-card";
 import { usePublicBets } from "@/features/bets/hooks";
 import {
@@ -13,11 +14,13 @@ import {
 } from "@/features/leaderboard/components/leaderboard-panel";
 import { usePublicLeaderboard } from "@/features/leaderboard/hooks";
 import { errorMessage } from "@/lib/api-client";
-import type { LeaderboardWindow } from "@/lib/types";
+import type { BetListStatus, LeaderboardWindow } from "@/lib/types";
 
 export default function PublicMarketsPage() {
   const router = useRouter();
-  const bets = usePublicBets();
+  const [betPage, setBetPage] = useState(1);
+  const [betStatus, setBetStatus] = useState<BetListStatus>("all");
+  const bets = usePublicBets({ page: betPage, status: betStatus });
   const [showCreate, setShowCreate] = useState(false);
   const [window, setWindow] = useState<LeaderboardWindow>("weekly");
   const leaderboard = usePublicLeaderboard(window);
@@ -50,15 +53,25 @@ export default function PublicMarketsPage() {
 
       <div className="content-grid">
         <section className="stack">
+          <BetListControls
+            data={bets.data}
+            disabled={bets.isFetching}
+            onPageChange={setBetPage}
+            onStatusChange={(status) => {
+              setBetStatus(status);
+              setBetPage(1);
+            }}
+            status={betStatus}
+          />
           {bets.isLoading ? <Loading /> : null}
           {bets.error ? <ErrorNotice message={errorMessage(bets.error)} /> : null}
-          {!bets.isLoading && !bets.data?.length ? (
+          {!bets.isLoading && !bets.data?.items.length ? (
             <EmptyState
               body="Create the first standalone market for signed-in players."
               title="No public calls yet"
             />
           ) : null}
-          {bets.data?.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
+          {bets.data?.items.map((bet) => <MarketCard bet={bet} key={bet.id} />)}
         </section>
         <aside className="stack">
           <Card className="card-pad">
@@ -81,4 +94,3 @@ export default function PublicMarketsPage() {
     </>
   );
 }
-

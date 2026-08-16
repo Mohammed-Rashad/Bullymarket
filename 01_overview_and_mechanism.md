@@ -140,6 +140,11 @@ winner is paid.
 
 ## 6. API contract
 
+- `GET /api/v1/public-bets?status=open&page=1&page_size=12` and
+  `GET /api/v1/groups/{id}/bets?...` — visibility-aware, status-filtered paginated
+  feeds. `status` is optional (`open`, `closed`, or `resolved`), pages are one-based,
+  and `page_size` is limited to 100. Responses contain `items`, `page`, `page_size`,
+  `total`, and `total_pages`.
 - `GET /api/v1/markets/{id}/price` — current LMSR prices and quantities; read-only and
   unauthenticated.
 - `GET /api/v1/markets/{id}/quote?side=yes&shares=N` — signed hypothetical quote with

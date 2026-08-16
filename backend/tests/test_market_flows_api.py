@@ -317,7 +317,7 @@ async def test_cancellation_refunds_every_stake(client: AsyncClient) -> None:
     assert await balance(client, creator_token) == Decimal(1000)
 
     public_feed = await client.get("/api/v1/public-bets", headers=auth(other_token))
-    assert all(row["id"] != bet["id"] for row in public_feed.json())
+    assert all(row["id"] != bet["id"] for row in public_feed.json()["items"])
     board = await client.get(
         "/api/v1/leaderboards/public?window=all_time",
         headers=auth(other_token),
@@ -391,7 +391,7 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
         headers=auth(member_token),
     )
     assert group_feed.status_code == 200
-    assert [row["id"] for row in group_feed.json()] == [existing_bet["id"]]
+    assert [row["id"] for row in group_feed.json()["items"]] == [existing_bet["id"]]
 
     cancellation = await client.delete(
         f"/api/v1/bets/{existing_bet['id']}",
@@ -401,6 +401,74 @@ async def test_removed_member_keeps_only_existing_market_until_settlement(
     assert await balance(client, member_token) == Decimal(1000)
     settled_groups = await client.get("/api/v1/groups", headers=auth(member_token))
     assert settled_groups.json() == []
+
+
+@pytest.mark.asyncio
+async def test_bet_feeds_support_status_filters_and_pagination(
+    client: AsyncClient,
+) -> None:
+    token = await signup(client, "pages@test.com", "Pager")
+    resolved_bet = await create_public_bet(client, token, question="Resolved?")
+    closed_bet = await create_public_bet(client, token, question="Closed?")
+    await create_public_bet(client, token, question="Open?")
+
+    await expire_bet(resolved_bet["id"])
+    resolved = await client.post(
+        f"/api/v1/bets/{resolved_bet['id']}/resolve",
+        json={"outcome_id": resolved_bet["outcomes"][0]["id"]},
+        headers=auth(token),
+    )
+    assert resolved.status_code == 200
+    await expire_bet(closed_bet["id"])
+
+    first_page = await client.get(
+        "/api/v1/public-bets",
+        params={"page": 1, "page_size": 2},
+        headers=auth(token),
+    )
+    assert first_page.status_code == 200
+    assert first_page.json()["page"] == 1
+    assert first_page.json()["page_size"] == 2
+    assert first_page.json()["total"] == 3
+    assert first_page.json()["total_pages"] == 2
+    assert len(first_page.json()["items"]) == 2
+
+    second_page = await client.get(
+        "/api/v1/public-bets",
+        params={"page": 2, "page_size": 2},
+        headers=auth(token),
+    )
+    assert len(second_page.json()["items"]) == 1
+
+    for expected_status in ("open", "closed", "resolved"):
+        filtered = await client.get(
+            "/api/v1/public-bets",
+            params={"status": expected_status, "page": 1, "page_size": 10},
+            headers=auth(token),
+        )
+        assert filtered.status_code == 200
+        assert filtered.json()["total"] == 1
+        assert {row["status"] for row in filtered.json()["items"]} == {
+            expected_status
+        }
+
+    group = await create_group(client, token, "Paged group")
+    await create_group_bet(client, token, group["id"], question="Group open?")
+    group_closed = await create_group_bet(
+        client,
+        token,
+        group["id"],
+        question="Group closed?",
+    )
+    await expire_bet(group_closed["id"])
+    filtered_group = await client.get(
+        f"/api/v1/groups/{group['id']}/bets",
+        params={"status": "closed", "page": 1, "page_size": 1},
+        headers=auth(token),
+    )
+    assert filtered_group.status_code == 200
+    assert filtered_group.json()["total"] == 1
+    assert filtered_group.json()["items"][0]["status"] == "closed"
 
 
 @pytest.mark.asyncio
