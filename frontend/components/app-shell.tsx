@@ -11,10 +11,10 @@ import { useUnreadNotifications } from "@/features/notifications/hooks";
 import { AUTH_FAILURE_EVENT } from "@/lib/api-client";
 
 const links = [
-  { href: "/groups", label: "My groups" },
-  { href: "/public", label: "Public markets" },
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/how-it-works", label: "How it works" },
+  { href: "/groups", label: "My groups", shortLabel: "Groups" },
+  { href: "/public", label: "Public markets", shortLabel: "Public" },
+  { href: "/leaderboard", label: "Leaderboard", shortLabel: "Leaders" },
+  { href: "/how-it-works", label: "How it works", shortLabel: "Guide" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -63,11 +63,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="nav-links" aria-label="Primary navigation">
           {links.map((link) => (
             <Link
+              aria-label={link.label}
               className={pathname.startsWith(link.href) ? "active" : ""}
               href={link.href}
               key={link.href}
             >
-              {link.label}
+              <span className="nav-label-full" aria-hidden="true">
+                {link.label}
+              </span>
+              <span className="nav-label-short" aria-hidden="true">
+                {link.shortLabel}
+              </span>
             </Link>
           ))}
         </nav>
