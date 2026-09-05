@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,9 +33,10 @@ class Settings(BaseSettings):
     verification_max_attempts: int = 5
     verification_resend_seconds: int = 60
     email_enabled: bool = False
-    smtp_host: str = "smtp.mx.cloudflare.net"
-    smtp_port: int = 465
-    smtp_username: str = "api_token"
+    smtp_host: str = "smtp-relay.brevo.com"
+    smtp_port: int = 587
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    smtp_username: str = ""
     smtp_password: SecretStr | None = None
     email_from_address: str = "no-reply@example.com"
     email_from_name: str = "BullyMarket"

@@ -121,7 +121,8 @@ Set these values in `backend/.env`:
 ```env
 BULLYMARKET_EMAIL_ENABLED=true
 BULLYMARKET_SMTP_HOST=smtp-relay.brevo.com
-BULLYMARKET_SMTP_PORT=465
+BULLYMARKET_SMTP_PORT=587
+BULLYMARKET_SMTP_SECURITY=starttls
 BULLYMARKET_SMTP_USERNAME=your-smtp-login-from-brevo
 BULLYMARKET_SMTP_PASSWORD=your-brevo-smtp-key
 BULLYMARKET_EMAIL_FROM_ADDRESS=no-reply@bullymarket.morashad.com
@@ -129,8 +130,8 @@ BULLYMARKET_EMAIL_FROM_NAME=BullyMarket
 BULLYMARKET_FRONTEND_URL=http://localhost:3000
 ```
 
-Brevo recommends port 587 for clients using STARTTLS, but the current worker uses
-implicit TLS. Therefore it must use Brevo's SSL port `465`. See
+Port `587` uses STARTTLS and is the recommended default here. If you deliberately use
+Brevo's implicit-TLS port `465`, set `BULLYMARKET_SMTP_SECURITY=ssl` as well. See
 [Brevo's SMTP port guidance](https://help.brevo.com/hc/en-us/articles/10905415650322-Which-SMTP-port-should-I-use-Port-587-465-or-2525).
 
 Restart the API and worker after changing the environment:

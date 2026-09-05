@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from pydantic import SecretStr
 
 from app.core.config import Settings
-from app.modules.notifications.email import _build_email_message
+from app.modules.notifications.email import _build_email_message, _send_smtp
 from app.modules.notifications.models import EmailOutbox
 from app.modules.notifications.templates import branded_email
 
@@ -56,3 +56,47 @@ def test_email_message_embeds_the_logo_as_an_inline_image() -> None:
     assert len(logo_parts) == 1
     assert logo_parts[0]["Content-ID"] == "<bullymarket-logo>"
     assert logo_parts[0].get_content_disposition() == "inline"
+
+
+def test_brevo_port_587_uses_starttls(monkeypatch) -> None:
+    calls: list[str] = []
+
+    class FakeSmtp:
+        def __init__(self, host: str, port: int, timeout: int) -> None:
+            assert (host, port, timeout) == ("smtp-relay.brevo.com", 587, 20)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def ehlo(self) -> None:
+            calls.append("ehlo")
+
+        def starttls(self) -> None:
+            calls.append("starttls")
+
+        def login(self, username: str, password: str) -> None:
+            assert (username, password) == ("smtp-login", "smtp-key")
+            calls.append("login")
+
+        def send_message(self, _message) -> None:
+            calls.append("send")
+
+    monkeypatch.setattr("app.modules.notifications.email.smtplib.SMTP", FakeSmtp)
+    outbox = EmailOutbox(
+        recipient_email="player@example.com",
+        subject="Test delivery",
+        text_body="Plain text",
+        html_body="<p>HTML</p>",
+        category="test",
+    )
+    settings = Settings(
+        smtp_username="smtp-login",
+        smtp_password="smtp-key",
+    )
+
+    _send_smtp(outbox, settings)
+
+    assert calls == ["ehlo", "starttls", "ehlo", "login", "send"]

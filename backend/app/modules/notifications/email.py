@@ -40,7 +40,12 @@ def _send_smtp(message: EmailOutbox, settings: Settings) -> None:
     if password is None:
         raise RuntimeError("SMTP password is not configured")
     email = _build_email_message(message, settings)
-    with smtplib.SMTP_SSL(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+    smtp_class = smtplib.SMTP_SSL if settings.smtp_security == "ssl" else smtplib.SMTP
+    with smtp_class(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+        if settings.smtp_security == "starttls":
+            smtp.ehlo()
+            smtp.starttls()
+            smtp.ehlo()
         smtp.login(settings.smtp_username, password.get_secret_value())
         smtp.send_message(email)
 

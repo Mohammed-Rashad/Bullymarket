@@ -676,8 +676,12 @@ async def test_group_lifecycle_notifications_never_include_public_bets(
 ) -> None:
     admin_token = await signup(client, "notify-admin@test.com", "Notify Admin")
     member_token = await signup(client, "notify-member@test.com", "Notify Member")
+    second_member_token = await signup(
+        client, "notify-member-two@test.com", "Notify Member Two"
+    )
     group = await create_group(client, admin_token, "Notification Group")
     await join_group(client, member_token, group["invite_code"])
+    await join_group(client, second_member_token, group["invite_code"])
 
     group_bet = await create_group_bet(
         client,
@@ -698,17 +702,39 @@ async def test_group_lifecycle_notifications_never_include_public_bets(
     ]
     assert member_feed.json()["items"][0]["bet_id"] == group_bet["id"]
 
+    second_member_feed = await client.get(
+        "/api/v1/notifications", headers=auth(second_member_token)
+    )
+    assert [item["kind"] for item in second_member_feed.json()["items"]] == [
+        NotificationKind.BET_CREATED.value
+    ]
+
     async with db.SessionFactory() as session:
+        group_email_recipients = set(
+            await session.scalars(
+                select(EmailOutbox.recipient_email)
+                .join(Notification, EmailOutbox.notification_id == Notification.id)
+                .where(
+                    Notification.bet_id == UUID(group_bet["id"]),
+                    Notification.kind == NotificationKind.BET_CREATED,
+                )
+            )
+        )
         public_email_count = await session.scalar(
             select(func.count(EmailOutbox.id))
             .join(Notification, EmailOutbox.notification_id == Notification.id)
             .where(Notification.bet_id == UUID(public_bet["id"]))
         )
+    assert group_email_recipients == {
+        "notify-admin@test.com",
+        "notify-member@test.com",
+        "notify-member-two@test.com",
+    }
     assert public_email_count == 0
 
     await expire_bet(group_bet["id"])
     created, delivered = await run_notification_cycle(get_settings())
-    assert created == 2
+    assert created == 3
     assert delivered == 0
 
     member_feed = await client.get("/api/v1/notifications", headers=auth(member_token))
