@@ -13,7 +13,18 @@ import {
   useUpdateNotificationPreferences,
 } from "@/features/notifications/hooks";
 import { errorMessage } from "@/lib/api-client";
-import type { NotificationPreferences } from "@/lib/types";
+import type { NotificationKind, NotificationPreferences } from "@/lib/types";
+
+const notificationMeta: Record<
+  NotificationKind,
+  { icon: string; label: string }
+> = {
+  bet_created: { icon: "+", label: "New bet" },
+  bet_closed: { icon: "■", label: "Betting closed" },
+  resolution_reminder: { icon: "!", label: "Action needed" },
+  bet_resolved: { icon: "✓", label: "Resolved" },
+  bet_refunded: { icon: "↩", label: "Refunded" },
+};
 
 const preferenceLabels: Array<[keyof NotificationPreferences, string]> = [
   ["email_enabled", "Email notifications"],
@@ -72,45 +83,59 @@ export default function NotificationsPage() {
               title="Nothing new"
             />
           ) : null}
-          {notifications.data?.items.map((notification) => (
-            <Card
-              className={`notification-card ${notification.read_at ? "" : "unread"}`}
-              key={notification.id}
-            >
-              <div>
-                <div className="notification-heading">
-                  <strong>{notification.title}</strong>
-                  {!notification.read_at ? <span className="unread-dot" /> : null}
+          {notifications.data?.items.map((notification) => {
+            const meta = notificationMeta[notification.kind];
+            return (
+              <Card
+                className={`notification-card notification-${notification.kind} ${
+                  notification.read_at ? "" : "unread"
+                }`}
+                key={notification.id}
+              >
+                <div className="notification-icon" aria-hidden="true">
+                  {meta.icon}
                 </div>
-                <p>{notification.body}</p>
-                <small>{new Date(notification.created_at).toLocaleString()}</small>
-              </div>
-              <div className="notification-actions">
-                {notification.bet_id ? (
-                  <Link
-                    className="button compact secondary"
-                    href={`/bets/${notification.bet_id}`}
-                    onClick={() => {
-                      if (!notification.read_at) {
-                        markRead.mutate(notification.id);
-                      }
-                    }}
-                  >
-                    Open bet
-                  </Link>
-                ) : null}
-                {!notification.read_at ? (
-                  <button
-                    className="text-button"
-                    onClick={() => markRead.mutate(notification.id)}
-                    type="button"
-                  >
-                    Mark read
-                  </button>
-                ) : null}
-              </div>
-            </Card>
-          ))}
+                <div className="notification-content">
+                  <div className="notification-meta">
+                    <span>{meta.label}</span>
+                    <time dateTime={notification.created_at}>
+                      {new Date(notification.created_at).toLocaleString(undefined, {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </time>
+                    {!notification.read_at ? <span className="unread-dot" /> : null}
+                  </div>
+                  <h2>{notification.title}</h2>
+                  <p>{notification.body}</p>
+                </div>
+                <div className="notification-actions">
+                  {notification.bet_id ? (
+                    <Link
+                      className={`button compact ${notification.read_at ? "secondary" : ""}`}
+                      href={`/bets/${notification.bet_id}`}
+                      onClick={() => {
+                        if (!notification.read_at) {
+                          markRead.mutate(notification.id);
+                        }
+                      }}
+                    >
+                      Open bet
+                    </Link>
+                  ) : null}
+                  {!notification.read_at ? (
+                    <button
+                      className="text-button"
+                      onClick={() => markRead.mutate(notification.id)}
+                      type="button"
+                    >
+                      Mark read
+                    </button>
+                  ) : null}
+                </div>
+              </Card>
+            );
+          })}
           {notifications.data && notifications.data.total_pages > 1 ? (
             <div className="pagination-controls">
               <Button

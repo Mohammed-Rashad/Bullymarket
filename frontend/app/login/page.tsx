@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
@@ -24,7 +25,7 @@ export default function LoginPage() {
     <main className="auth-page">
       <section className="auth-art">
         <Link className="brand" href="/">
-          <span className="brand-mark">B</span>
+          <Image alt="" className="brand-logo" height={44} priority src="/logo.png" width={43} />
           <strong>BullyMarket</strong>
         </Link>
         <h1>Back your take. Then live with the receipts.</h1>

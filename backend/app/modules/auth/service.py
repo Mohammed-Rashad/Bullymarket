@@ -23,6 +23,7 @@ from app.modules.auth.schemas import (
 from app.modules.ledger.models import LedgerEntryType
 from app.modules.ledger.service import add_entry
 from app.modules.notifications.service import queue_email
+from app.modules.notifications.templates import branded_email
 from app.modules.users.repository import create_user, get_user_by_email
 
 
@@ -117,18 +118,32 @@ async def request_signup(
     )
     session.add(challenge)
     expiry = settings.verification_code_minutes
+    email_content = branded_email(
+        frontend_url=settings.frontend_url,
+        subject="Confirm your BullyMarket email",
+        preheader=f"Use code {code} to finish creating your BullyMarket account.",
+        eyebrow="Email verification",
+        title="You’re one step away",
+        greeting=f"Hi {challenge.display_name},",
+        paragraphs=(
+            "Use the code below to confirm your email and finish creating your account.",
+            "Once verified, you’ll receive your starting points and can join your first group.",
+        ),
+        details=(("Account", email), ("Expires in", f"{expiry} minutes")),
+        code=code,
+        action_label="Return to signup",
+        action_path="/signup",
+        note=(
+            "You did not create a BullyMarket account? You can safely ignore this email. "
+            "Never share this code with anyone."
+        ),
+    )
     await queue_email(
         session,
         recipient_email=email,
-        subject="Your BullyMarket registration code",
-        text_body=(
-            f"Your BullyMarket verification code is {code}. "
-            f"It expires in {expiry} minutes."
-        ),
-        html_body=(
-            f"<p>Your BullyMarket verification code is <strong>{code}</strong>.</p>"
-            f"<p>It expires in {expiry} minutes.</p>"
-        ),
+        subject=email_content.subject,
+        text_body=email_content.text,
+        html_body=email_content.html,
         category="registration_otp",
     )
     return VerificationChallengeResponse(
@@ -213,19 +228,35 @@ async def request_password_reset(
                     sent_at=now,
                 )
             )
+            email_content = branded_email(
+                frontend_url=settings.frontend_url,
+                subject="Reset your BullyMarket password",
+                preheader=f"Use code {code} to reset your BullyMarket password.",
+                eyebrow="Password recovery",
+                title="Reset your password",
+                greeting=f"Hi {user.display_name},",
+                paragraphs=(
+                    "We received a request to reset the password for your account.",
+                    "Enter the code below on the password-reset page, then choose a new password.",
+                ),
+                details=(
+                    ("Account", email),
+                    ("Expires in", f"{settings.verification_code_minutes} minutes"),
+                ),
+                code=code,
+                action_label="Continue password reset",
+                action_path="/forgot-password",
+                note=(
+                    "If you did not request a password reset, ignore this email. Your current "
+                    "password will remain unchanged. Never share this code with anyone."
+                ),
+            )
             await queue_email(
                 session,
                 recipient_email=email,
-                subject="Reset your BullyMarket password",
-                text_body=(
-                    f"Your BullyMarket password reset code is {code}. "
-                    f"It expires in {settings.verification_code_minutes} minutes."
-                ),
-                html_body=(
-                    f"<p>Your BullyMarket password reset code is "
-                    f"<strong>{code}</strong>.</p>"
-                    f"<p>It expires in {settings.verification_code_minutes} minutes.</p>"
-                ),
+                subject=email_content.subject,
+                text_body=email_content.text,
+                html_body=email_content.html,
                 category="password_reset_otp",
                 user_id=user.id,
             )

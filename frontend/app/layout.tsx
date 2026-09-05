@@ -17,6 +17,11 @@ const displayFont = Space_Grotesk({
 export const metadata: Metadata = {
   title: "BullyMarket",
   description: "Prediction markets for the group chat.",
+  icons: {
+    icon: [{ url: "/logo.png", type: "image/png" }],
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -32,4 +37,3 @@ export default function RootLayout({
     </html>
   );
 }
-

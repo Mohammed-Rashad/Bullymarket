@@ -84,17 +84,12 @@ h3,
   width: fit-content;
 }
 
-.brand-mark {
-  display: grid;
+.brand-logo {
+  display: block;
   width: 42px;
-  height: 42px;
-  place-items: center;
-  border: 2px solid var(--ink);
-  border-radius: 13px 13px 13px 4px;
-  background: var(--lime);
-  box-shadow: 3px 3px 0 var(--ink);
-  font-size: 1.25rem;
-  font-weight: 800;
+  height: 43px;
+  flex: 0 0 auto;
+  object-fit: contain;
 }
 
 .brand strong,
@@ -649,11 +644,32 @@ h3,
 }
 
 .notification-card {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 20px;
+  gap: 16px;
+  overflow: hidden;
+  padding: 20px 20px 20px 22px;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.notification-card::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: #b2b7bd;
+  content: "";
+}
+
+.notification-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
 }
 
 .notification-card.unread {
@@ -661,27 +677,104 @@ h3,
   background: rgba(255, 255, 255, 0.96);
 }
 
-.notification-heading {
+.notification-bet_created::before {
+  background: var(--blue);
+}
+
+.notification-bet_closed::before {
+  background: #8b929a;
+}
+
+.notification-resolution_reminder::before {
+  background: var(--coral);
+}
+
+.notification-bet_resolved::before {
+  background: var(--lime-dark);
+}
+
+.notification-bet_refunded::before {
+  background: #ad7918;
+}
+
+.notification-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(23, 26, 31, 0.045);
+  font-family: var(--font-display), sans-serif;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.notification-bet_created .notification-icon {
+  background: rgba(87, 124, 255, 0.11);
+  color: var(--blue);
+}
+
+.notification-resolution_reminder .notification-icon {
+  background: rgba(255, 118, 95, 0.13);
+  color: #b74735;
+}
+
+.notification-bet_resolved .notification-icon {
+  background: rgba(200, 241, 53, 0.24);
+  color: #607d00;
+}
+
+.notification-bet_refunded .notification-icon {
+  background: rgba(221, 166, 61, 0.14);
+  color: #8b5c07;
+}
+
+.notification-content {
+  min-width: 0;
+}
+
+.notification-meta {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.notification-meta > span:first-child {
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.notification-meta time::before {
+  margin-right: 8px;
+  content: "·";
+}
+
+.notification-card h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
 }
 
 .notification-card p {
-  margin: 6px 0;
+  max-width: 660px;
+  margin: 6px 0 0;
   color: var(--muted);
   line-height: 1.5;
-}
-
-.notification-card small {
-  color: var(--muted);
 }
 
 .unread-dot {
   width: 8px;
   height: 8px;
+  margin-left: 2px;
   border-radius: 50%;
   background: var(--blue);
+  box-shadow: 0 0 0 3px rgba(87, 124, 255, 0.12);
 }
 
 .notification-actions {
@@ -1015,12 +1108,18 @@ h3,
   }
 
   .notification-card {
+    grid-template-columns: 42px minmax(0, 1fr);
     align-items: stretch;
-    flex-direction: column;
   }
 
   .notification-actions {
+    grid-column: 2;
     justify-content: flex-start;
+  }
+
+  .notification-icon {
+    width: 42px;
+    height: 42px;
   }
 
   .form-row,

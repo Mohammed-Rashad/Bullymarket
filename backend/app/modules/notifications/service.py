@@ -1,5 +1,5 @@
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from html import escape
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,7 @@ from app.modules.notifications.schemas import (
     NotificationResponse,
     UpdateNotificationPreferencesRequest,
 )
+from app.modules.notifications.templates import branded_email
 from app.modules.users.models import User
 from app.modules.users.service import list_users_by_ids
 
@@ -103,22 +104,115 @@ async def _visible_group_users(
     return group.name, await list_users_by_ids(session, list(visible_ids))
 
 
+@dataclass(frozen=True)
+class EventCopy:
+    title: str
+    body: str
+    subject: str
+    email_title: str
+    email_paragraphs: tuple[str, ...]
+    action_label: str
+    status_label: str
+
+
+def _display_time(value: datetime) -> str:
+    aware = value.replace(tzinfo=UTC) if value.tzinfo is None else value
+    return aware.astimezone(UTC).strftime("%d %b %Y, %H:%M UTC")
+
+
+def _subject(prefix: str, question: str) -> str:
+    return f"{prefix}: {question}"[:300]
+
+
 def _event_copy(
     *,
     kind: NotificationKind,
     question: str,
     group_name: str,
     outcome_label: str | None,
-) -> tuple[str, str]:
+    end_time: datetime,
+) -> EventCopy:
+    closes_at = _display_time(end_time)
     if kind is NotificationKind.BET_CREATED:
-        return "New group bet", f'{group_name}: "{question}" is now open.'
+        return EventCopy(
+            title=f"New bet in {group_name}",
+            body=(
+                f'“{question}” is open until {closes_at}. Review the live odds and place '
+                "your prediction before betting closes."
+            ),
+            subject=_subject("New group bet", question),
+            email_title="A new prediction is open",
+            email_paragraphs=(
+                f"A new market has been created in {group_name}.",
+                "Open it to review the outcomes, check the latest odds, and make your pick.",
+            ),
+            action_label="View bet and odds",
+            status_label="Open for predictions",
+        )
     if kind is NotificationKind.RESOLUTION_REMINDER:
-        return "Resolve your group bet", f'Betting closed for "{question}". Pick the winner.'
+        return EventCopy(
+            title="Your bet is ready for resolution",
+            body=(
+                f'Betting has closed for “{question}” in {group_name}. Confirm the final '
+                "outcome so winning positions can be settled."
+            ),
+            subject=_subject("Action needed — resolve your bet", question),
+            email_title="Your bet needs a result",
+            email_paragraphs=(
+                f"Betting has ended for your market in {group_name}.",
+                "Open the bet, confirm what happened, and select the winning outcome to settle it.",
+            ),
+            action_label="Resolve this bet",
+            status_label="Awaiting resolution",
+        )
     if kind is NotificationKind.BET_CLOSED:
-        return "Group bet closed", f'Betting closed for "{question}". Waiting for resolution.'
+        return EventCopy(
+            title=f"Betting closed in {group_name}",
+            body=(
+                f'“{question}” no longer accepts predictions. You’ll be notified when the '
+                "winning outcome is confirmed."
+            ),
+            subject=_subject("Betting closed", question),
+            email_title="Predictions are now closed",
+            email_paragraphs=(
+                f"The prediction window has ended for this market in {group_name}.",
+                "No more trades can be placed. The market is now waiting for its final result.",
+            ),
+            action_label="Review closed bet",
+            status_label="Awaiting resolution",
+        )
     if kind is NotificationKind.BET_RESOLVED:
-        return "Group bet resolved", f'"{question}" resolved as {outcome_label or "a winner"}.'
-    return "Group bet refunded", f'"{question}" was cancelled. All stakes were refunded.'
+        winner = outcome_label or "the selected outcome"
+        return EventCopy(
+            title=f"Resolved: {winner}",
+            body=(
+                f'“{question}” in {group_name} resolved as {winner}. Winning positions '
+                "have been paid automatically."
+            ),
+            subject=_subject(f"Resolved — {winner}", question),
+            email_title="The result is in",
+            email_paragraphs=(
+                f"The market in {group_name} has been resolved as {winner}.",
+                "All winning positions have been settled automatically. Open the bet to review it.",
+            ),
+            action_label="Review result",
+            status_label="Resolved",
+        )
+    return EventCopy(
+        title=f"Bet cancelled in {group_name}",
+        body=(
+            f'“{question}” was cancelled. Any points committed to this market were returned '
+            "automatically."
+        ),
+        subject=_subject("Bet cancelled and refunded", question),
+        email_title="This bet was cancelled",
+        email_paragraphs=(
+            f"The market in {group_name} has been cancelled.",
+            "Eligible stakes were returned automatically. No action is required from you.",
+        ),
+        action_label="Review refund",
+        status_label="Cancelled and refunded",
+    )
 
 
 async def notify_group_bet(
@@ -147,17 +241,18 @@ async def notify_group_bet(
             bet_id=bet.id,
         ):
             continue
-        title, body = _event_copy(
+        copy = _event_copy(
             kind=user_kind,
             question=bet.question,
             group_name=group_name,
             outcome_label=outcome_label,
+            end_time=bet.end_time,
         )
         notification = Notification(
             user_id=user.id,
             kind=user_kind,
-            title=title,
-            body=body,
+            title=copy.title,
+            body=copy.body,
             group_id=bet.group_id,
             bet_id=bet.id,
         )
@@ -165,15 +260,36 @@ async def notify_group_bet(
         await session.flush()
         preferences = await get_or_create_preferences(session, user.id)
         if _email_allowed(preferences, user_kind):
-            link = f"{settings.frontend_url.rstrip('/')}/bets/{bet.id}"
+            details = [
+                ("Group", group_name),
+                ("Market", bet.question),
+                ("Status", copy.status_label),
+                ("Betting closed", _display_time(bet.end_time)),
+            ]
+            if user_kind is NotificationKind.BET_RESOLVED and outcome_label:
+                details.append(("Winning outcome", outcome_label))
+            email_content = branded_email(
+                frontend_url=settings.frontend_url,
+                subject=copy.subject,
+                preheader=copy.body,
+                eyebrow=user_kind.value.replace("_", " "),
+                title=copy.email_title,
+                greeting=f"Hi {user.display_name},",
+                paragraphs=copy.email_paragraphs,
+                details=tuple(details),
+                action_label=copy.action_label,
+                action_path=f"/bets/{bet.id}",
+                note=(
+                    "You received this because you are a member of this group and have "
+                    "email notifications enabled for this event."
+                ),
+            )
             await queue_email(
                 session,
                 recipient_email=user.email,
-                subject=f"BullyMarket — {title}",
-                text_body=f"{body}\n\nOpen market: {link}",
-                html_body=(
-                    f"<p>{escape(body)}</p><p><a href=\"{escape(link)}\">Open market</a></p>"
-                ),
+                subject=email_content.subject,
+                text_body=email_content.text,
+                html_body=email_content.html,
                 category=user_kind.value,
                 user_id=user.id,
                 notification_id=notification.id,

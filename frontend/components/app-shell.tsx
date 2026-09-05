@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
@@ -45,7 +46,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="app-frame">
       <header className="topbar">
         <Link className="brand" href="/">
-          <span className="brand-mark">B</span>
+          <Image
+            alt=""
+            aria-hidden="true"
+            className="brand-logo"
+            height={44}
+            priority
+            src="/logo.png"
+            width={43}
+          />
           <span>
             <strong>BullyMarket</strong>
             <small>friendly stakes, sharp calls</small>
