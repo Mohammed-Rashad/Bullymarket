@@ -37,7 +37,9 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const token = getToken();
   const headers = new Headers(init.headers);
-  if (init.body && !headers.has("content-type")) {
+  const isFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body && !isFormData && !headers.has("content-type")) {
     headers.set("content-type", "application/json");
   }
   if (token) headers.set("authorization", `Bearer ${token}`);
@@ -67,6 +69,12 @@ export async function apiFetch<T>(
   }
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
+}
+
+export function mediaUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined;
+  if (/^(?:https?:\/\/|blob:|data:)/i.test(path)) return path;
+  return `${API_URL.replace(/\/api\/v1\/?$/, "")}${path}`;
 }
 
 export function errorMessage(error: unknown): string {

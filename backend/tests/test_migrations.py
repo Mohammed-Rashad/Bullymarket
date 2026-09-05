@@ -41,6 +41,15 @@ def test_initial_migration_upgrades_and_downgrades(tmp_path: Path) -> None:
         "notifications",
         "email_outbox",
     } <= tables
+    with sqlite3.connect(_sqlite_path(database_url)) as connection:
+        group_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info('groups')")
+        }
+        bet_columns = {
+            row[1] for row in connection.execute("PRAGMA table_info('bets')")
+        }
+    assert "image_url" in group_columns
+    assert "image_url" in bet_columns
     command.check(config)
 
     with sqlite3.connect(_sqlite_path(database_url)) as connection:

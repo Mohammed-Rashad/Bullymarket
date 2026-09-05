@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 
 import { Button, ErrorNotice, Input } from "@/components/ui";
+import { ImagePicker } from "@/components/image-picker";
+import { useUploadImage } from "@/features/media/hooks";
 import { errorMessage } from "@/lib/api-client";
 import type { GroupMember } from "@/lib/types";
 import { useCreateBet } from "../hooks";
@@ -17,6 +19,7 @@ export function CreateBetForm({
   onCreated?: (betId: string) => void;
 }) {
   const create = useCreateBet(groupId);
+  const uploadImage = useUploadImage();
   const [question, setQuestion] = useState("");
   const [description, setDescription] = useState("");
   const [yesLabel, setYesLabel] = useState("Yes");
@@ -25,12 +28,20 @@ export function CreateBetForm({
   const [bLiquidity, setBLiquidity] = useState("100");
   const [restricted, setRestricted] = useState(false);
   const [visibleIds, setVisibleIds] = useState<string[]>([]);
+  const [image, setImage] = useState<File | null>(null);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string>();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    let imageUrl = uploadedImageUrl;
+    if (image && !imageUrl) {
+      imageUrl = (await uploadImage.mutateAsync(image)).image_url;
+      setUploadedImageUrl(imageUrl);
+    }
     const bet = await create.mutateAsync({
       question,
       description: description || undefined,
+      image_url: imageUrl,
       end_time: new Date(endTime).toISOString(),
       outcome_labels: [yesLabel, noLabel],
       b_liquidity: bLiquidity,
@@ -38,6 +49,8 @@ export function CreateBetForm({
     });
     setQuestion("");
     setDescription("");
+    setImage(null);
+    setUploadedImageUrl(undefined);
     onCreated?.(bet.id);
   }
 
@@ -64,6 +77,14 @@ export function CreateBetForm({
           value={description}
         />
       </div>
+      <ImagePicker
+        file={image}
+        label="Bet image"
+        onChange={(file) => {
+          setImage(file);
+          setUploadedImageUrl(undefined);
+        }}
+      />
       <div className="form-row">
         <div className="field">
           <label htmlFor="outcome-a">First outcome</label>
@@ -149,8 +170,15 @@ export function CreateBetForm({
       {create.error ? (
         <ErrorNotice message={errorMessage(create.error)} />
       ) : null}
-      <Button disabled={create.isPending} type="submit">
-        {create.isPending ? "Opening market…" : "Open market"}
+      {uploadImage.error ? (
+        <ErrorNotice message={errorMessage(uploadImage.error)} />
+      ) : null}
+      <Button disabled={create.isPending || uploadImage.isPending} type="submit">
+        {uploadImage.isPending
+          ? "Uploading image…"
+          : create.isPending
+            ? "Opening market…"
+            : "Open market"}
       </Button>
     </form>
   );

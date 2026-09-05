@@ -10,6 +10,7 @@ import {
   ErrorNotice,
   Loading,
 } from "@/components/ui";
+import { MediaImage } from "@/components/media-image";
 import { CreateBetForm } from "@/features/bets/components/create-bet-form";
 import { BetListControls } from "@/features/bets/components/bet-list-controls";
 import { MarketCard } from "@/features/bets/components/market-card";
@@ -64,6 +65,11 @@ export default function GroupDetailPage() {
 
   return (
     <>
+      <MediaImage
+        alt={`${group.name} cover`}
+        className="group-cover"
+        src={group.image_url ?? undefined}
+      />
       <header className="page-title">
         <div>
           <span className="eyebrow">

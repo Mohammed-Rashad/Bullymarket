@@ -13,6 +13,7 @@ backend/.env
 backend/bullymarket.db
 backend/dist/
 backend/*.egg-info/
+backend/uploads/
 
 frontend/.env.local
 frontend/.next/

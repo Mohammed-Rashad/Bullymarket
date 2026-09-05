@@ -53,6 +53,7 @@ app/
     leaderboard/          # read-only aggregation queries over ledger + groups + bets
     refill/          # the scheduled job that adds the periodic points refill
     notifications/          # in-app events, preferences, email outbox + worker
+    media/          # authenticated, signature-validated image uploads
   core/
     db.py          # async engine/session setup, shared by all modules
     config.py          # env-based settings (pydantic-settings)
@@ -145,6 +146,13 @@ modules/<name>/
   models.py          # SQLAlchemy models for this module's own tables
   schemas.py          # Pydantic request/response models
 ```
+
+The media module accepts authenticated multipart uploads, reads no more than the
+configured maximum plus one byte, validates the file signature instead of trusting its
+name or browser content type, and generates an opaque filename. `/media` is a public
+static mount because group and bet covers are presentation assets; access to the group
+or bet data itself continues to be enforced by its API. The database stores only the
+managed path, while Compose keeps the bytes in a persistent named volume.
 
 `router.py` should contain almost no logic — its job is: parse request, call one or two
 `service.py` functions, shape the response, done. All the actual decision-making (can

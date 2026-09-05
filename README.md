@@ -7,6 +7,7 @@ public-market area. No real money is used.
 
 - Always-available binary trading using LMSR pricing
 - Private groups, invites, member visibility controls, and group-scoped leaderboards
+- Optional uploaded cover images for groups and bets
 - Separate public markets and a public leaderboard
 - Final, immutable market resolution and automatic cancellation refunds
 - Per-market and aggregate house profit/loss accounting
@@ -49,6 +50,12 @@ docker compose ps
 This starts PostgreSQL, applies migrations, starts the API at `http://localhost:8000`,
 and starts the notification/email worker. API documentation is at
 `http://localhost:8000/docs`. The frontend intentionally runs separately.
+
+Uploaded images are served by the backend under `/media` and persisted in the Compose
+`media-data` volume, so rebuilding the API container does not remove them. The default
+limit is 5 MB and only JPEG, PNG, WebP, and GIF signatures are accepted. Do not use
+`docker compose down -v` unless you intentionally want to delete both database and
+uploaded-image volumes.
 
 To follow the logs:
 

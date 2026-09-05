@@ -5,11 +5,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.modules.bets.models import BetStatus, BetVisibility, PricingMethod
+from app.modules.media.service import is_managed_image_url
 
 
 class CreateBetRequest(BaseModel):
     question: str = Field(min_length=1, max_length=300)
     description: str | None = Field(default=None, max_length=5000)
+    image_url: str | None = Field(default=None, max_length=500)
     end_time: datetime
     outcome_labels: list[str]
     visible_to_user_ids: list[UUID] | None = None
@@ -31,6 +33,13 @@ class CreateBetRequest(BaseModel):
         if cleaned[0].casefold() == cleaned[1].casefold():
             raise ValueError("outcome labels must be distinct")
         return cleaned
+
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, value: str | None) -> str | None:
+        if not is_managed_image_url(value):
+            raise ValueError("image_url must reference an uploaded image")
+        return value
 
 
 class EditEndTimeRequest(BaseModel):
@@ -55,6 +64,7 @@ class BetResponse(BaseModel):
     created_by: UUID
     question: str
     description: str | None
+    image_url: str | None
     visibility: BetVisibility
     status: BetStatus
     end_time: datetime

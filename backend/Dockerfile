@@ -22,7 +22,8 @@ ENV PATH="/opt/venv/bin:${PATH}" \
 
 WORKDIR /app
 
-RUN addgroup --system app && adduser --system --ingroup app app
+RUN addgroup --system app && adduser --system --ingroup app app \
+    && mkdir -p /app/uploads && chown app:app /app/uploads
 
 COPY --from=builder /opt/venv /opt/venv
 COPY --chown=app:app app ./app

@@ -40,8 +40,10 @@ but should be environment/config-driven, not literals buried in code:
   only that group's resolved bets, while global uses only standalone public bets.
 - Polling-based odds updates (not real-time push).
 - Backend-verified registration email OTP and forgot-password reset flow.
-- Persistent in-app group notifications plus configurable Cloudflare SMTP email for
+- Persistent in-app group notifications plus configurable Brevo SMTP email for
   created, closed/reminder, resolved, and refunded events. Public bets are excluded.
+- Optional backend-managed group and bet cover images, limited to validated raster image
+  formats and persisted outside the database.
 
 **Deferred to v2 (schema left not-actively-hostile to these, per notes throughout, but
 not built now):**

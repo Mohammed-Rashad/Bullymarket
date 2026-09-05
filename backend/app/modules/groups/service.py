@@ -59,12 +59,14 @@ async def create_group(
     *,
     name: str,
     description: str | None,
+    image_url: str | None,
     creator_id: UUID,
 ) -> tuple[Group, GroupMember]:
     return await repository.create_group(
         session,
         name=name,
         description=description,
+        image_url=image_url,
         creator_id=creator_id,
         invite_code=secrets.token_urlsafe(8),
     )

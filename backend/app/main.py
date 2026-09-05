@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.responses import Response
 
@@ -15,6 +16,7 @@ from app.core.logging import configure_logging, request_id_context
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging()
+    settings.media_root.mkdir(parents=True, exist_ok=True)
     app = FastAPI(title=settings.app_name, version="0.1.0")
     app.add_middleware(
         CORSMiddleware,
@@ -53,6 +55,11 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(api_router)
+    app.mount(
+        "/media",
+        StaticFiles(directory=settings.media_root),
+        name="media",
+    )
     return app
 
 

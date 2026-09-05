@@ -16,12 +16,14 @@ async def create_group(
     *,
     name: str,
     description: str | None,
+    image_url: str | None,
     creator_id: UUID,
     invite_code: str,
 ) -> tuple[Group, GroupMember]:
     group = Group(
         name=name.strip(),
         description=description,
+        image_url=image_url,
         created_by=creator_id,
         invite_code=invite_code,
     )

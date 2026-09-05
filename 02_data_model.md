@@ -13,7 +13,8 @@ balance is derived from `SUM(ledger_entries.amount)`; it is not a mutable user c
 
 ### `groups` and `group_members`
 
-`groups` stores name, description, creator, and invite code. `group_members` has a unique
+`groups` stores name, description, optional managed `image_url`, creator, and invite
+code. `group_members` has a unique
 `(group_id, user_id)`, scoped role (`member`/`admin`), and retained status
 (`active`/`removed`). Removal never destroys settlement history. Member API responses
 join the current user `display_name` for presentation; names are not duplicated in the
@@ -46,6 +47,7 @@ Core columns include scope/status, creator, question, end time, current resoluti
 | `house_reserve` | funded maximum exposure, `b * ln(2)` |
 | `house_cash_balance` | running signed house cash from trades, refunds, and payouts |
 | `house_profit_loss` | final realized P/L; null until settlement, zero when cancelled |
+| `image_url` | optional backend-managed `/media/images/...` cover path |
 
 Scope is enforced by named check constraint `ck_bets_scope_matches_group`:
 
@@ -144,8 +146,9 @@ reported as realized profit.
 - `notifications` stores an append-only user event with read time and optional group/bet
   links. Unique `(user_id, kind, bet_id)` makes lifecycle emission idempotent.
 - `email_outbox` stores durable email work, delivery attempts, retry availability, and
-  sent/failed state. The worker sends through implicit-TLS SMTP and retries transient
-  errors without holding up API requests.
+  sent/failed state. The worker supports STARTTLS (Brevo port 587), implicit TLS, and
+  explicitly configured plaintext SMTP, and retries transient errors without holding up
+  API requests.
 
 Notification selection starts from active group membership and applies restricted-bet
 visibility. Bet creators receive a resolution reminder when their market closes; other
@@ -171,3 +174,7 @@ within the same transaction.
 Alembic revision `0003` adds verification challenges, notification preferences,
 notifications, and the durable email outbox with reversible indexes, constraints, enum
 types, and foreign keys.
+
+Alembic revision `0004` adds nullable `image_url` columns to `groups` and `bets`.
+Uploaded bytes live outside PostgreSQL in the configured media directory; Docker Compose
+persists that directory in the `media-data` volume.

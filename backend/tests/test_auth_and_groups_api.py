@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -136,6 +137,53 @@ async def test_group_join_roles_and_removal_state(client: AsyncClient) -> None:
 async def test_unauthenticated_request_is_rejected(client: AsyncClient) -> None:
     response = await client.get("/api/v1/users/me")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_uploaded_image_can_be_assigned_to_a_group_and_bet(
+    client: AsyncClient,
+) -> None:
+    token = await signup(client, email="images@example.com", display_name="Images")
+    uploaded = await client.post(
+        "/api/v1/uploads/images",
+        files={"image": ("cover.png", b"\x89PNG\r\n\x1a\ncover", "image/png")},
+        headers=auth(token),
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    image_url = uploaded.json()["image_url"]
+    assert image_url.startswith("/media/images/")
+
+    served = await client.get(image_url)
+    assert served.status_code == 200
+    assert served.content.startswith(b"\x89PNG")
+
+    created_group = await client.post(
+        "/api/v1/groups",
+        json={"name": "Photo group", "image_url": image_url},
+        headers=auth(token),
+    )
+    assert created_group.status_code == 201, created_group.text
+    assert created_group.json()["image_url"] == image_url
+
+    created_bet = await client.post(
+        f"/api/v1/groups/{created_group.json()['id']}/bets",
+        json={
+            "question": "Does this cover render?",
+            "image_url": image_url,
+            "end_time": (datetime.now(UTC) + timedelta(days=1)).isoformat(),
+            "outcome_labels": ["Yes", "No"],
+        },
+        headers=auth(token),
+    )
+    assert created_bet.status_code == 201, created_bet.text
+    assert created_bet.json()["image_url"] == image_url
+
+    unmanaged = await client.post(
+        "/api/v1/groups",
+        json={"name": "External image", "image_url": "https://example.com/image.png"},
+        headers=auth(token),
+    )
+    assert unmanaged.status_code == 422
 
 
 @pytest.mark.asyncio

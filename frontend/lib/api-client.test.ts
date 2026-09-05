@@ -5,6 +5,7 @@ import {
   ApiError,
   TOKEN_KEY,
   apiFetch,
+  mediaUrl,
 } from "./api-client";
 
 describe("apiFetch", () => {
@@ -28,6 +29,30 @@ describe("apiFetch", () => {
     const request = fetchMock.mock.calls[0];
     const headers = new Headers(request[1]?.headers);
     expect(headers.get("authorization")).toBe("Bearer test-token");
+  });
+
+  it("lets the browser set multipart boundaries for form data", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ image_url: "/media/images/photo.png" }), {
+        status: 201,
+      }),
+    );
+    const body = new FormData();
+    body.append("image", new File(["image"], "photo.png", { type: "image/png" }));
+
+    await apiFetch("/uploads/images", { method: "POST", body });
+
+    const headers = new Headers(fetchMock.mock.calls[0][1]?.headers);
+    expect(headers.has("content-type")).toBe(false);
+  });
+
+  it("resolves managed and local-preview image URLs", () => {
+    expect(mediaUrl("/media/images/photo.png")).toBe(
+      "http://localhost:8000/media/images/photo.png",
+    );
+    expect(mediaUrl("blob:http://localhost/preview")).toBe(
+      "blob:http://localhost/preview",
+    );
   });
 
   it("preserves domain error codes and request IDs", async () => {

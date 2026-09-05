@@ -114,3 +114,15 @@ Commit: `phase 15: paginate and filter market feeds`
 
 Commits: `phase 18: add secure email auth and notifications` and
 `phase 18: add notification and recovery UI`
+
+## Phase 24 — durable group and bet images
+
+- Add authenticated multipart image upload with size and file-signature validation.
+- Add optional managed image paths to groups and bets through Alembic revision `0004`.
+- Persist uploaded media in a Docker named volume and serve it from `/media`.
+- Add reusable image selection/preview UI and responsive covers to group and bet cards
+  and detail pages.
+- Gate: migration checks, backend lint/types/tests, frontend lint/types/tests/build, and
+  Compose validation.
+
+Commit: `phase 24: add group and bet cover images`

@@ -44,6 +44,7 @@ def _group_response(
         id=group.id,
         name=group.name,
         description=group.description,
+        image_url=group.image_url,
         invite_code=(
             group.invite_code
             if membership.status is MembershipStatus.ACTIVE
@@ -67,6 +68,7 @@ async def create_group_route(
         session,
         name=payload.name,
         description=payload.description,
+        image_url=payload.image_url,
         creator_id=current_user.id,
     )
     return _group_response(group, membership)

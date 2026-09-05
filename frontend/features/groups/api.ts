@@ -5,7 +5,11 @@ export function listGroups() {
   return apiFetch<Group[]>("/groups");
 }
 
-export function createGroup(input: { name: string; description?: string }) {
+export function createGroup(input: {
+  name: string;
+  description?: string;
+  image_url?: string;
+}) {
   return apiFetch<Group>("/groups", {
     method: "POST",
     body: JSON.stringify(input),
@@ -28,4 +32,3 @@ export function removeMember(groupId: string, userId: string) {
     method: "DELETE",
   });
 }
-

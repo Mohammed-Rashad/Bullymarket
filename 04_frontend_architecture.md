@@ -28,6 +28,7 @@ features/                    # mirrors backend modules
   trading/          # signed LMSR trade flow, quotes, prices, and audit
   leaderboard/
   notifications/          # feed, unread polling, read state, email preferences
+  media/          # multipart upload API and mutation hook
 components/          # truly generic, cross-feature UI (Button, Card, Modal — no business logic)
 lib/
   api-client.ts          # shared fetch wrapper: base URL, auth header injection, error handling
@@ -62,6 +63,8 @@ which recomputes the quote while holding the market lock.
   used only as internal keys and API values. Creating here always creates a group bet;
   there is no "make public"
   toggle because public bets do not belong to groups.
+  Group creation accepts an optional local cover image, previews it before submission,
+  uploads it once, and then stores the returned managed path with the group.
 - **Bet detail page**: question, current odds from the polled `/price` response, a
   buy-share form with the live quote described above, immutable trade audit, and market
   position details. Internal pricing-method and house-accounting figures are deliberately
@@ -73,6 +76,8 @@ which recomputes the quote while holding the market lock.
   group bet), and once `status = resolved`, the payout breakdown and the
   final `resolution_event`. Resolved markets expose no settlement or end-time mutation
   controls.
+  Bet creation uses the same optional image picker, and responsive covers appear in
+  feed cards and the detail header without routing image bytes through React state.
 - **Leaderboard page**: toggle between weekly / bi-weekly / monthly / all-time. A group
   view shows realized points won/lost only from resolved bets in that selected group;
   the global/public view shows realized points won/lost only from standalone public

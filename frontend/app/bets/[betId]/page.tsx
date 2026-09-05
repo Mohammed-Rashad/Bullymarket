@@ -10,6 +10,7 @@ import {
   Input,
   Loading,
 } from "@/components/ui";
+import { MediaImage } from "@/components/media-image";
 import {
   useBet,
   useCancelBet,
@@ -70,6 +71,11 @@ export default function BetDetailPage() {
   return (
     <div className="stack">
       <Card className="market-detail-header">
+        <MediaImage
+          alt={`${bet.question} cover`}
+          className="market-detail-image"
+          src={bet.image_url ?? undefined}
+        />
         <div className="market-meta">
           <span className="scope-chip">
             {bet.visibility === "public" ? "standalone public" : group?.name ?? "group"}

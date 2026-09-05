@@ -24,6 +24,7 @@ class Group(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str | None] = mapped_column(String(1000))
+    image_url: Mapped[str | None] = mapped_column(String(500))
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     invite_code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -55,4 +56,3 @@ class GroupMember(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-

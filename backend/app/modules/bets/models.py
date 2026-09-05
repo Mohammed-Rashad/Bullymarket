@@ -61,6 +61,7 @@ class Bet(Base):
     created_by: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     question: Mapped[str] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(Text)
+    image_url: Mapped[str | None] = mapped_column(String(500))
     visibility: Mapped[BetVisibility] = mapped_column(
         Enum(
             BetVisibility,

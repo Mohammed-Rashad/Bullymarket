@@ -23,6 +23,7 @@ export interface Group {
   id: string;
   name: string;
   description: string | null;
+  image_url: string | null;
   invite_code: string | null;
   created_by: string;
   created_at: string;
@@ -54,6 +55,7 @@ export interface Bet {
   created_by: string;
   question: string;
   description: string | null;
+  image_url: string | null;
   visibility: BetVisibility;
   status: BetStatus;
   end_time: string;
@@ -201,6 +203,7 @@ export interface BetEditEvent {
 export interface CreateBetInput {
   question: string;
   description?: string;
+  image_url?: string;
   end_time: string;
   outcome_labels: [string, string];
   visible_to_user_ids?: string[];
