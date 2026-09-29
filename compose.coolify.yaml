@@ -1,0 +1,122 @@
+# Coolify deployment for BullyMarket.
+#
+# PostgreSQL is intentionally NOT defined here. Create it as a managed Coolify
+# database so it gets scheduled backups, then point BULLYMARKET_DATABASE_URL at
+# it and enable "Connect to Predefined Network" on this resource.
+#
+# Only `web` is exposed. The browser talks to one origin; Next forwards /api and
+# /media to `api` over the internal network, so there is no CORS and no public
+# API domain.
+
+name: bullymarket
+
+services:
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["alembic", "upgrade", "head"]
+    environment: &api-environment
+      BULLYMARKET_ENVIRONMENT: ${BULLYMARKET_ENVIRONMENT:-production}
+      BULLYMARKET_DATABASE_URL: ${BULLYMARKET_DATABASE_URL:?point this at the managed Postgres}
+      BULLYMARKET_JWT_SECRET: ${BULLYMARKET_JWT_SECRET:?set at least 32 random bytes}
+      BULLYMARKET_ACCESS_TOKEN_MINUTES: ${BULLYMARKET_ACCESS_TOKEN_MINUTES:-1440}
+      BULLYMARKET_DEFAULT_STARTING_BALANCE: ${BULLYMARKET_DEFAULT_STARTING_BALANCE:-1000}
+      BULLYMARKET_DEFAULT_LIQUIDITY_SEED: ${BULLYMARKET_DEFAULT_LIQUIDITY_SEED:-100}
+      BULLYMARKET_DEFAULT_LMSR_LIQUIDITY: ${BULLYMARKET_DEFAULT_LMSR_LIQUIDITY:-100}
+      BULLYMARKET_MINIMUM_TRADE_AMOUNT: ${BULLYMARKET_MINIMUM_TRADE_AMOUNT:-1}
+      BULLYMARKET_REFILL_AMOUNT: ${BULLYMARKET_REFILL_AMOUNT:-500}
+      BULLYMARKET_REFILL_INTERVAL_DAYS: ${BULLYMARKET_REFILL_INTERVAL_DAYS:-7}
+      # Same-origin deployment needs no cross-origin allowlist. Only set this if
+      # something outside the browser app ever calls the API directly.
+      BULLYMARKET_CORS_ORIGINS: '${BULLYMARKET_CORS_ORIGINS:-[]}'
+      # Public site URL. Used for links in outgoing email, not for routing.
+      BULLYMARKET_FRONTEND_URL: ${BULLYMARKET_FRONTEND_URL:?set the public site URL}
+      BULLYMARKET_VERIFICATION_CODE_MINUTES: ${BULLYMARKET_VERIFICATION_CODE_MINUTES:-10}
+      BULLYMARKET_VERIFICATION_MAX_ATTEMPTS: ${BULLYMARKET_VERIFICATION_MAX_ATTEMPTS:-5}
+      BULLYMARKET_VERIFICATION_RESEND_SECONDS: ${BULLYMARKET_VERIFICATION_RESEND_SECONDS:-60}
+      BULLYMARKET_EMAIL_ENABLED: ${BULLYMARKET_EMAIL_ENABLED:-false}
+      BULLYMARKET_SMTP_HOST: ${BULLYMARKET_SMTP_HOST:-smtp-relay.brevo.com}
+      BULLYMARKET_SMTP_PORT: ${BULLYMARKET_SMTP_PORT:-587}
+      BULLYMARKET_SMTP_SECURITY: ${BULLYMARKET_SMTP_SECURITY:-starttls}
+      BULLYMARKET_SMTP_USERNAME: ${BULLYMARKET_SMTP_USERNAME:-}
+      BULLYMARKET_SMTP_PASSWORD: ${BULLYMARKET_SMTP_PASSWORD:-}
+      BULLYMARKET_EMAIL_FROM_ADDRESS: ${BULLYMARKET_EMAIL_FROM_ADDRESS:-no-reply@example.com}
+      BULLYMARKET_EMAIL_FROM_NAME: ${BULLYMARKET_EMAIL_FROM_NAME:-BullyMarket}
+      BULLYMARKET_NOTIFICATION_WORKER_INTERVAL_SECONDS: ${BULLYMARKET_NOTIFICATION_WORKER_INTERVAL_SECONDS:-30}
+      BULLYMARKET_EMAIL_DELIVERY_BATCH_SIZE: ${BULLYMARKET_EMAIL_DELIVERY_BATCH_SIZE:-20}
+      BULLYMARKET_MEDIA_ROOT: /app/uploads
+      BULLYMARKET_IMAGE_MAX_BYTES: ${BULLYMARKET_IMAGE_MAX_BYTES:-5242880}
+    restart: "no"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment: *api-environment
+    expose:
+      - "8000"
+    volumes:
+      - media-data:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    init: true
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["python", "-m", "app.modules.notifications.worker"]
+    environment: *api-environment
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        API_PROXY_TARGET: http://api:8000
+        NEXT_PUBLIC_API_URL: /api/v1
+    environment:
+      SERVICE_FQDN_WEB_3000: /
+      API_PROXY_TARGET: http://api:8000
+    expose:
+      - "3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    init: true
+    restart: unless-stopped
+
+volumes:
+  media-data:

@@ -1,5 +1,4 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "/api/v1";
 
 export const TOKEN_KEY = "bullymarket_access_token";
 export const AUTH_FAILURE_EVENT = "bullymarket-auth-failed";

@@ -48,7 +48,7 @@ describe("apiFetch", () => {
 
   it("resolves managed and local-preview image URLs", () => {
     expect(mediaUrl("/media/images/photo.png")).toBe(
-      "http://localhost:8000/media/images/photo.png",
+      "/media/images/photo.png",
     );
     expect(mediaUrl("blob:http://localhost/preview")).toBe(
       "blob:http://localhost/preview",

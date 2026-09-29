@@ -82,6 +82,10 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+The frontend calls the API at the relative path `/api/v1`, and the Next.js dev server
+forwards `/api` and `/media` to `http://localhost:8000`. Override that target with
+`API_PROXY_TARGET` if the backend runs elsewhere.
+
 ## Configure email with Brevo
 
 Cloudflare continues to host the DNS records, but Brevo sends the messages.
@@ -152,6 +156,66 @@ docker compose logs -f worker
 Registration and password-reset codes are validated only by the backend and are never
 returned to the browser. If email is disabled or the worker is stopped, messages remain
 queued and users cannot receive their verification codes.
+
+## Deploy to Coolify
+
+The deployment is same-origin: the browser only ever talks to the Next.js server,
+which forwards `/api` and `/media` to the API over the internal Docker network. There
+is no public API domain, no CORS allowlist, and no public URL baked into the frontend
+build, so changing the domain never requires a rebuild.
+
+`compose.coolify.yaml` describes `migrate`, `api`, `worker`, and `web`. It deliberately
+does **not** define PostgreSQL.
+
+### 1. Create the database
+
+In Coolify, create a managed **PostgreSQL** resource and enable scheduled backups on it.
+Backups only work for managed databases, which is why Postgres is not part of the
+Compose stack. Copy its internal connection URL.
+
+### 2. Create the application
+
+**+ New → Docker Compose**, pointed at this repository:
+
+- Base Directory: `/`
+- Docker Compose Location: `compose.coolify.yaml`
+- Enable **Connect to Predefined Network** so the stack can reach the managed database
+
+Set the domain on the `web` service to your public URL. No other service is exposed.
+
+### 3. Set the environment
+
+```env
+BULLYMARKET_DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DATABASE
+BULLYMARKET_JWT_SECRET=<openssl rand -base64 48>
+BULLYMARKET_FRONTEND_URL=https://bullymarket.example.com
+BULLYMARKET_EMAIL_ENABLED=true
+BULLYMARKET_SMTP_USERNAME=<brevo smtp login>
+BULLYMARKET_SMTP_PASSWORD=<brevo smtp key>
+BULLYMARKET_EMAIL_FROM_ADDRESS=no-reply@bullymarket.example.com
+```
+
+The connection URL must use the `postgresql+asyncpg://` scheme, not `postgres://`.
+`BULLYMARKET_FRONTEND_URL` is used only for links in outgoing email, never for routing.
+`BULLYMARKET_CORS_ORIGINS` defaults to `[]` and should stay empty unless something
+outside the browser app calls the API directly.
+
+Deploy. `migrate` applies migrations and exits with code 0 before `api` and `worker`
+start; a stopped `migrate` container is the expected end state, not a failure.
+
+### 4. Schedule the balance refill
+
+The refill is not automatic. Add a Coolify **Scheduled Task** on this resource:
+
+- Container: `api`
+- Command: `python -m app.modules.refill.job`
+- Frequency: `0 3 * * 1`
+
+### What persists
+
+Uploaded images live in the `media-data` volume, which survives redeploys but is not
+covered by the database backups and is destroyed if the resource is deleted. The
+database is covered by the managed Postgres backup schedule.
 
 ## Run the balance refill
 
